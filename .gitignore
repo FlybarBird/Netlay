@@ -5,6 +5,7 @@ release/1.*
 mobile/Builds
 openwrt/output
 openwrt/build
+dist/
 .DS_Store
 **/.DS_Store
 *.user

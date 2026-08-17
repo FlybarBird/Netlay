@@ -175,12 +175,18 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
 
 
     # platform specific stuff
+    set (NETLAY_ASIO 0)
+    set (NETLAY_OPUS_LIB opus)
     if (APPLE)
         list (APPEND HEADER_INCLUDES deps/mac/include)
         list (APPEND LIB_PATHS ${CMAKE_CURRENT_SOURCE_DIR}/deps/mac/lib)
         list (APPEND PlatSourceFiles  Source/CrossPlatformUtilsMac.mm)
     elseif (WIN32)
-        list (APPEND HEADER_INCLUDES deps/windows ../asiosdk/common)
+        list (APPEND HEADER_INCLUDES deps/windows)
+        if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../asiosdk/common/asio.h")
+            list (APPEND HEADER_INCLUDES ../asiosdk/common)
+            set (NETLAY_ASIO 1)
+        endif()
         list (APPEND PlatSourceFiles  Source/CrossPlatformUtilsWindows.cpp)
 
 	message (STATUS "Win generator platform is: ${CMAKE_VS_PLATFORM_NAME}" )
@@ -189,11 +195,13 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
                 $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/deps/windows/Debug32>
                 $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/deps/windows/Release32>
             )
+            set (NETLAY_OPUS_LIB "${CMAKE_CURRENT_SOURCE_DIR}/deps/windows/Release32/opus.lib")
         else()
             list (APPEND LIB_PATHS
                 $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/deps/windows/Debug>
                 $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/deps/windows/Release>
             )
+            set (NETLAY_OPUS_LIB "${CMAKE_CURRENT_SOURCE_DIR}/deps/windows/Release/opus.lib")
         endif()
 
         list (APPEND PLAT_COMPILE_DEFS
@@ -416,7 +424,7 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1
 	JUCE_USE_WINDOWS_MEDIA_FORMAT=1
         JUCE_LOAD_CURL_SYMBOLS_LAZILY=1
-        JUCE_ASIO=1
+        JUCE_ASIO=${NETLAY_ASIO}
         JUCE_WASAPI=1
         JUCE_DIRECTSOUND=0
         JUCE_JACK=1
@@ -559,8 +567,7 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
             ff_meters
             
             ${target_name}_SBData
-
-            opus
+            ${NETLAY_OPUS_LIB}
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
