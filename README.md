@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/netlay_logo_readme.png" alt="Netlay" width="440">
+  <img src="images/netlay_wordmark_readme.png" alt="Netlay — Sound without distance." width="560">
 </p>
 
 <p align="center">
