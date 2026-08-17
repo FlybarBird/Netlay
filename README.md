@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/netlay_wordmark.png" alt="Netlay — Sound without distance." width="560">
+  <img src="images/netlay_logo_readme.png" alt="Netlay" width="440">
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 **Netlay** is a slim, standalone network-audio app. It is a focused fork of [SonoBus](https://github.com/sonosaurus/sonobus): the same peer-to-peer Opus/PCM path, rebuilt around a simpler session UI and **remote mix control**.
 
 <p align="center">
-  <img src="images/netlay_icon_256.png" alt="Netlay icon" width="96">
+  <img src="images/netlay_icon_readme.png" alt="Netlay icon" width="96">
 </p>
 
 ## Download
@@ -71,12 +71,12 @@ flowchart LR
 
 A listen-only plugin for the **GL-BE3600**. USB speakers out, no mic send. Desktop Netlay can mix it from Group Control.
 
-```sh
-scp -O netlay-glbe3600_1.0.1-1_aarch64_cortex-a53_neon-vfpv4.ipk root@192.168.8.1:/tmp/
-ssh root@192.168.8.1 'opkg install --force-reinstall /tmp/netlay-glbe3600_1.0.1-1_aarch64_cortex-a53_neon-vfpv4.ipk'
-```
+1. Download [`netlay-glbe3600_1.0.1` IPK](https://github.com/FlybarBird/Netlay/releases/download/v1.1.0/netlay-glbe3600_1.0.1-1_aarch64_cortex-a53_neon-vfpv4.ipk).
+2. Open the router admin at [192.168.8.1](http://192.168.8.1) → **SYSTEM → Advanced Settings** → **LuCI**.
+3. In LuCI: **System → Software → Upload Package…**, choose the IPK, then **Install**.
+4. Back in the GL.iNet UI: **Applications → Netlay**. Same group name as the desktops. Leave **Allow remote mix** on.
 
-Then **Applications → Netlay**. Same group name as the desktops. Leave **Allow remote mix** on. Details: [openwrt/README.md](openwrt/README.md).
+Details: [openwrt/README.md](openwrt/README.md).
 
 ## Tips
 

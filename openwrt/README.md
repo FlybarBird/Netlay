@@ -48,14 +48,19 @@ brew install zig gnu-tar
 
 ## Install
 
+1. Copy `openwrt/output/netlay-glbe3600_*.ipk` (or the [release IPK](https://github.com/FlybarBird/Netlay/releases/tag/v1.1.0)) to a computer on the Slate’s LAN.
+2. Open [192.168.8.1](http://192.168.8.1) → **SYSTEM → Advanced Settings** → **LuCI**.
+3. In LuCI: **System → Software → Upload Package…**, choose the IPK, then **Install**.
+4. Return to the GL.iNet UI and open **Applications → Netlay**.
+
+If LuCI reports a malformed package, install from SSH instead:
+
 ```sh
 scp -O openwrt/output/netlay-glbe3600_*.ipk root@192.168.8.1:/tmp/
 ssh root@192.168.8.1 'opkg install /tmp/netlay-glbe3600_*.ipk'
 ```
 
-Prefer `scp` + `opkg install` over the LuCI upload box if the web installer reports a malformed package.
-
-Open **Applications → Netlay**. Enter the same group name (and password) as the other Netlay clients, pick the USB device, click **Connect**. Leave **Allow others to control my mix** on if a desktop Netlay should drive this box from Group Control.
+Enter the same group name (and password) as the other Netlay clients, pick the USB device, click **Connect**. Leave **Allow others to control my mix** on if a desktop Netlay should drive this box from Group Control.
 
 ## How it works
 
