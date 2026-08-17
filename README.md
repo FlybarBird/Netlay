@@ -1,128 +1,80 @@
+# Netlay
 
-# SonoBus
+**Netlay** is a slim, standalone network-audio app for playing and mixing together over the internet or a local network. Pick a group name, join, and you’re connected.
 
-SonoBus is an easy to use application for streaming high-quality, low-latency peer-to-peer audio between devices over the internet or a local network.
+It is a focused fork of [SonoBus](https://github.com/sonosaurus/sonobus): same peer-to-peer Opus/PCM audio path, rebuilt around a simpler session UI and **remote mix control**.
 
-Simply choose a unique group name (with optional password), and instantly connect multiple people together to make music, remote sessions, podcasts, etc. Easily record the audio from everyone, as well as playback any audio content to the whole group.
+Current version: **1.1.0** (macOS standalone).
 
-Connects multiple users together to send and receive audio among all in a group, with fine-grained control over latency, quality and overall mix. Includes optional input compression, noise gate, and EQ effects, along with a master reverb. All settings are dynamic, network statistics are clearly visible.
+## What’s different
 
-Works as a standalone application on macOS, Windows, iOS, and Linux, and as an audio plugin (AU, VST) on macOS and Windows. Use it on your desktop or in your DAW, or on your mobile device.
+- **One window, five pages** — Network, Peers, Group Control, Soundboard, Settings
+- **Group Control** — move another person’s listen mix from your machine (true remote control, not just your own monitoring)
+- **Mixing Station–style strips** — vertical faders, meters, mute, for remote levels and for your local input mixer (under Settings)
+- **Standalone only** — no VST/AU/LV2 plugin targets in this fork
+- **Trimmed feature set** — chat, FX, reverb, recording, metronome, and several other SonoBus surfaces are off by default
 
-Easy to setup and use, yet still provides all the details that audio nerds want to see. Audio quality can be instantly adjusted from full uncompressed PCM (16, 24, or 32 bit) or with various compressed bitrates (16-256 kbps per channel) using the low-latency Opus codec, and you can do this independently for any of the users you are connected with in a group.
+## Group Control
 
+Group Control is for running someone else’s mix while you play.
 
-<img src="https://sonobus.net/assets/images/sonobus_screenshot.png" width="871" />
+1. Join the same group as the people you want to control.
+2. Open **Group Control**.
+3. Use **Main Mix** (defaults to everyone connected) or create a named control group and pick members / sources.
+4. Move a fader — that source’s receive level (or mute) changes on the target’s machine, and their UI follows.
 
-**IMPORTANT TIPS**
+Transport stays on the existing `/sb` OSC path over UDP, with sequence numbers, ACK/NACK, coalesced retries, and periodic snapshot reconcile so a dropped packet can’t leave a fader stuck.
 
-SonoBus does not use any echo cancellation, or automatic noise
-reduction in order to maintain the highest audio quality. As a result, if you have a live microphone signal you will need to also use headphones to prevent echos and/or feedback.
+Targets can turn control off in **Settings → Allow others to control my mix** (on by default). While someone is driving your mix, the header shows who.
 
-For best results, and to achieve the lowest latencies, connect your computer with wired ethernet to your router if you can. Although it will work with WiFi, the added network jitter and packet loss will require you to use a bigger safety buffer to maintain a quality audio signal, which results in higher latencies.
+Local input grouping (channel groups, send mono/stereo/multichannel) lives on **Settings**, under Options.
 
-SonoBus does NOT currently use any encryption for the data
-communication, so while it is unlikely that it will be
-intercepted, please keep that in mind. All audio is sent directly between users peer-to-peer, the connection server is only used so that the users in a group can find each other.
+## Tips
 
+- Use headphones if you have a live mic — there is no echo cancellation.
+- Wired ethernet beats Wi‑Fi for lowest latency.
+- Audio is peer-to-peer. The connection server is only used so people in a group can find each other. Data is not encrypted.
 
+## Building (macOS)
 
-# Installing
+You need [CMake](https://cmake.org) ≥ 3.15 and Xcode / Command Line Tools. Dependencies (JUCE, AOO, Opus, etc.) are vendored in this repo.
 
-## Windows and Mac
-There are binary releases for macOS and Windows available at [sonobus.net](https://sonobus.net) or in the releases of this repository on GitHub.
-
-## Linux
-
-There are packages available for Debian-based Linux distributions as well as a Snap package. See installation instructions at [sonobus.net/linux.html](https://sonobus.net/linux.html).
-
-Or if you prefer, you can build it yourself following the [build instructions](#on-linux) below.
-
-# Building
-
-The original GitHub repository for this project is at
-[github.com/sonosaurus/sonobus](https://github.com/sonosaurus/sonobus).
-
-To build from source on macOS and Windows, all of the dependencies are a part of this GIT repository, including prebuilt Opus libraries. 
-The build now uses [CMake](https://cmake.org) 3.15 or above on macOS, Windows, and Linux platforms, see
-details below.
-
-### On macOS
-
-Make sure you have [CMake](https://cmake.org) >= 3.15 and XCode. Then run:
+```bash
+export PATH="/opt/homebrew/bin:$PATH"   # if needed on Apple Silicon
+cmake -S . -B build
+cmake --build build --config Release
 ```
-./setupcmake.sh
-./buildcmake.sh
-``` 
-The resulting application and plugins will end up under `build/SonoBus_artefacts/Release`
-when the build completes. If you would rather have an Xcode project to look
-at, use `./setupcmakexcode.sh` instead and use the Xcode project that gets
-produced at `buildXcode/SonoBus.xcodeproj`.
 
-### On Windows
+The app lands at:
 
-You will need [CMake](https://cmake.org) >= 3.15, and  Visual Studio 2017
-installed. You'll also need Cygwin installed if you want to use the scripts
-below, but you can also use CMake in other ways if you prefer.
-
+```text
+build/SonoBus_artefacts/Release/Standalone/Netlay.app
 ```
-./setupcmakewin.sh
-./buildcmake.sh
-``` 
-The resulting application and plugins will end up under `build/SonoBus_artefacts/Release`
-when the build completes. The MSVC project/solution can be found in
-build/SonoBus_artefacts as well after the cmake setup step.
 
+Optional helper scripts from upstream still work if you prefer them: `./setupcmake.sh` then `./buildcmake.sh`.
 
-### On Linux
+## Repository layout
 
-The first thing to do in a terminal is go to the Linux directory:
+| Path | Role |
+|------|------|
+| `Source/` | App UI and processor (including remote mix) |
+| `Source/SonobusFeatures.h` | Compile-time feature switches for this slim fork |
+| `images/` | Netlay icons and wordmark |
+| `deps/` | Vendored JUCE, AOO, meters, Opus |
 
-    cd linux
+Active development is on the `simplify` branch.
 
-And read the [BUILDING.md](linux/BUILDING.md) file for
-further instructions.
+## License
 
+Netlay inherits SonoBus’s license: **GPLv3** (see `LICENSE`), with the App Store exception in `LICENSE_EXCEPTION` where applicable. Dependencies keep their own licenses.
 
-# License and 3rd Party Software
+SonoBus was written by Jesse Chappell. Netlay is based on that work and remains open source under the same terms.
 
-SonoBus was written by Jesse Chappell, and it is licensed under the GPLv3, the full license text is in the LICENSE file. Some of the dependencies have their own more permissive licenses.
+Upstream project: [github.com/sonosaurus/sonobus](https://github.com/sonosaurus/sonobus)
 
-It is built using JUCE 6 (slightly modified on a public fork), and AOO (Audio over OSC), which also uses the Opus codec. I'm using the very handy tool `git-subrepo` to include the source code for my forks of those software libraries in this repository.
+## Credits
 
-
-My github forks of these that are referenced via `git-subrepo` in this repository are:
-
-> https://github.com/essej/JUCE  in the sono6good branch.
-
-> https://github.com/essej/aoo.git   in the sono branch.
-
-
-If you want to run your own connection server instead of using the default
-one at aoo.sonobus.net, you can build the headless aooserver code at
-
-> https://github.com/essej/aooserver
-
-The standalone SonoBus application also provides a connection server internally,
-which you can connect to on port 10999, or port forward TCP/UDP 10999 from your internet
-router to the machine you are running it on.
-
-
-# Thanks
-
-Thanks for everyone involved in testing, especially to Christof Ressi for
-the AOO library.
-
-### Software development credits:
-
-- For designing and implementing the Soundboard feature:
-    - Sten Wessel
-    - Hannah Schellekens
-
-### Documentation credits:
- - Michael Eskin
- - Tony Becker
-
-### Translation credits:
- - RelationLife (Taewook Yang)
- 
+- **SonoBus** — Jesse Chappell
+- **AOO** — Christof Ressi
+- **Soundboard** — Sten Wessel, Hannah Schellekens
+- Built with JUCE and the Opus codec
