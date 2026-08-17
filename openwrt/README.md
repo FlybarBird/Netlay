@@ -43,7 +43,7 @@ On macOS. Zig cross-compiles a static `aarch64-linux-musl` binary. No Docker.
 ```sh
 brew install zig gnu-tar
 ./openwrt/scripts/build-mac-cross.sh
-# openwrt/output/netlay-glbe3600_1.0.0-1_aarch64_cortex-a53_neon-vfpv4.ipk
+# openwrt/output/netlay-glbe3600_1.0.1-1_aarch64_cortex-a53_neon-vfpv4.ipk
 ```
 
 ## Install
