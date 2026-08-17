@@ -39,7 +39,7 @@ public:
 
     std::function<void(AppPage)> onPageChanged;
 
-    Rectangle<int> getPageBounds() const { return pageHost.getBounds(); }
+    juce::Rectangle<int> getPageBounds() const { return pageHost.getBounds(); }
 
 private:
     void updateNavState();

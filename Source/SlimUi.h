@@ -82,7 +82,7 @@ namespace SlimUi
         return f;
     }
 
-    inline void paintCard (Graphics& g, Rectangle<int> bounds, float radius = cardRadius)
+    inline void paintCard (Graphics& g, juce::Rectangle<int> bounds, float radius = cardRadius)
     {
         auto r = bounds.toFloat();
         g.setColour (card());
