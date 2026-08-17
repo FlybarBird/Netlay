@@ -595,12 +595,19 @@ void RemoteControlPage::rebuildStrips()
         if (RemoteMix::isPeerSource (id))
         {
             const auto uname = RemoteMix::peerNameFromId (id);
-            for (int p = 0; p < processor.getNumberRemotePeers(); ++p)
-                if (processor.getRemotePeerUserName (p) == uname)
-                {
-                    strips[i]->setMeterSource (processor.getRemotePeerRecvMeterSource (p));
-                    break;
-                }
+            if (uname == processor.getCurrentUsername())
+            {
+                strips[i]->setMeterSource (&processor.getPostInputMeterSource());
+            }
+            else
+            {
+                for (int p = 0; p < processor.getNumberRemotePeers(); ++p)
+                    if (processor.getRemotePeerUserName (p) == uname)
+                    {
+                        strips[i]->setMeterSource (processor.getRemotePeerRecvMeterSource (p));
+                        break;
+                    }
+            }
         }
         else if (RemoteMix::isLocalSource (id))
         {

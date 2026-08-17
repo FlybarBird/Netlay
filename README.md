@@ -61,6 +61,7 @@ Optional helper scripts from upstream still work if you prefer them: `./setupcma
 | `Source/SonobusFeatures.h` | Compile-time feature switches for this slim fork |
 | `images/` | Netlay icons and wordmark |
 | `deps/` | Vendored JUCE, AOO, meters, Opus |
+| `openwrt/` | GL.iNet Slate 7 plugin (`netlayd` + Applications page). See [openwrt/README.md](openwrt/README.md). |
 
 Active development is on the `simplify` branch.
 

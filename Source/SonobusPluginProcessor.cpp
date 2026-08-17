@@ -3854,7 +3854,45 @@ Array<RemoteMix::SourceState> SonobusAudioProcessor::getLocalRemoteMixSnapshot()
 
 Array<RemoteMix::SourceState> SonobusAudioProcessor::getAvailableRemoteMixSources() const
 {
-    return getLocalRemoteMixSnapshot();
+    auto sources = getLocalRemoteMixSnapshot();
+
+    StringArray transmitting;
+    {
+        const ScopedReadLock sl (mCoreLock);
+        for (auto* peer : mRemotePeers)
+            if (peer->recvChannels > 0)
+                transmitting.addIfNotAlreadyThere (peer->userName);
+    }
+
+    for (int i = sources.size(); --i >= 0;)
+    {
+        if (! RemoteMix::isPeerSource (sources.getReference (i).id))
+            continue;
+        const String uname = RemoteMix::peerNameFromId (sources.getReference (i).id);
+        if (uname != mCurrentUsername && ! transmitting.contains (uname))
+            sources.remove (i);
+    }
+
+    if (mCurrentUsername.isNotEmpty())
+    {
+        const String selfId = RemoteMix::peerSourceId (mCurrentUsername);
+        bool has = false;
+        for (auto& s : sources)
+            if (s.id == selfId)
+            {
+                has = true;
+                break;
+            }
+        if (! has)
+        {
+            RemoteMix::SourceState self;
+            self.id = selfId;
+            self.name = mCurrentUsername;
+            self.kind = "peer";
+            sources.insert (0, self);
+        }
+    }
+    return sources;
 }
 
 void SonobusAudioProcessor::sendRemoteMixControl (const StringArray & targets, const String & sourceId, float gain, bool muted, bool live)
@@ -3953,27 +3991,42 @@ void SonobusAudioProcessor::ensureDefaultRemoteMixGroup()
         return;
 
     StringArray connected;
+    StringArray transmitting;
     {
         const ScopedReadLock sl (mCoreLock);
         for (auto* peer : mRemotePeers)
+        {
             connected.addIfNotAlreadyThere (peer->userName);
+            if (peer->recvChannels > 0)
+                transmitting.addIfNotAlreadyThere (peer->userName);
+        }
     }
 
-    // Main Mix tracks the session, but anything the user added by hand stays put.
+    // Members are everyone we can control (including listen-only devices).
+    // Strips are transmitters only: people actually sending audio, plus us.
     for (int i = g.members.size(); --i >= 0;)
         if (! connected.contains (g.members[i]))
             g.members.remove (i);
 
     for (int i = g.sourceIds.size(); --i >= 0;)
-        if (RemoteMix::isPeerSource (g.sourceIds[i])
-            && ! connected.contains (RemoteMix::peerNameFromId (g.sourceIds[i])))
+    {
+        if (! RemoteMix::isPeerSource (g.sourceIds[i]))
+            continue;
+        const String uname = RemoteMix::peerNameFromId (g.sourceIds[i]);
+        if (uname == mCurrentUsername)
+            continue;
+        if (! transmitting.contains (uname))
             g.sourceIds.remove (i);
+    }
 
     for (auto& user : connected)
-    {
         g.members.addIfNotAlreadyThere (user);
+
+    for (auto& user : transmitting)
         g.sourceIds.addIfNotAlreadyThere (RemoteMix::peerSourceId (user));
-    }
+
+    if (mCurrentUsername.isNotEmpty())
+        g.sourceIds.addIfNotAlreadyThere (RemoteMix::peerSourceId (mCurrentUsername));
 }
 
 int SonobusAudioProcessor::getRemoteMixControlGroupCount() const

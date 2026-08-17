@@ -1,0 +1,32 @@
+#!/bin/sh
+# Pick a USB Audio Class device for Netlay when one is plugged in.
+
+[ "$ACTION" = add ] || exit 0
+
+sleep 1
+
+[ -r /proc/asound/cards ] || exit 0
+
+usb_dev=""
+while IFS= read -r line; do
+	idx=$(echo "$line" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\)[[:space:]].*/\1/p')
+	[ -n "$idx" ] || continue
+	echo "$line" | grep -qi 'usb' || continue
+	usb_dev="hw:${idx},0"
+	break
+done < /proc/asound/cards
+
+[ -n "$usb_dev" ] || exit 0
+
+uci -q get netlay.main >/dev/null 2>&1 || exit 0
+cur=$(uci -q get netlay.main.device)
+if [ -z "$cur" ] || [ "$cur" = "auto" ] || [ "$cur" = "default" ]; then
+	uci set netlay.main.device="$usb_dev"
+	uci commit netlay
+fi
+
+if [ -S /var/run/netlay.ctl ]; then
+	/usr/bin/netlayd --ctl "{\"cmd\":\"status\"}" >/dev/null 2>&1 || true
+fi
+
+exit 0

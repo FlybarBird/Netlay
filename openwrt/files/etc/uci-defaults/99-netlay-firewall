@@ -1,0 +1,20 @@
+#!/bin/sh
+# Open WAN UDP for AOO hole-punching (local client port).
+
+[ -n "$IPKG_INSTROOT" ] && exit 0
+
+uci -q get firewall.netlay_aoo >/dev/null 2>&1 && exit 0
+
+udp_port=$(uci -q get netlay.main.udp_port)
+[ -n "$udp_port" ] || udp_port=28780
+
+uci set firewall.netlay_aoo=rule
+uci set firewall.netlay_aoo.name='Allow-Netlay-AOO'
+uci set firewall.netlay_aoo.src='wan'
+uci set firewall.netlay_aoo.dest_port="$udp_port"
+uci set firewall.netlay_aoo.proto='udp'
+uci set firewall.netlay_aoo.target='ACCEPT'
+uci commit firewall
+
+[ -x /etc/init.d/firewall ] && /etc/init.d/firewall reload >/dev/null 2>&1 || true
+exit 0

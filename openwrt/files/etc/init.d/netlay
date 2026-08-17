@@ -1,0 +1,67 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=10
+USE_PROCD=1
+
+PROG=/usr/bin/netlayd
+SOCK=/var/run/netlay.ctl
+
+json_escape() {
+	printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+start_service() {
+	config_load netlay
+	config_get udp_port main udp_port 28780
+	config_get device main device auto
+	config_get volume main volume 0.8
+	config_get enabled main enabled 0
+	config_get server main server aoo.sonobus.net
+	config_get port main port 10998
+	config_get group main group
+	config_get password main password
+	config_get username main username Slate7
+	config_get allow_remote_mix main allow_remote_mix 1
+
+	mkdir -p /var/run
+	modprobe snd-usb-audio >/dev/null 2>&1 || true
+
+	procd_open_instance
+	procd_set_param command "$PROG" --udp-port "$udp_port" --socket "$SOCK" --device "$device"
+	procd_set_param env ALSA_CONFIG_DIR=/usr/share/alsa ALSA_CONFIG_PATH=/usr/share/alsa/alsa.conf
+	procd_set_param respawn 3600 5 5
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_set_param pidfile /var/run/netlayd.pid
+	procd_close_instance
+
+	if [ "$enabled" = "1" ] && [ -n "$group" ]; then
+		json=$(printf '{"cmd":"connect","server":"%s","port":%s,"group":"%s","password":"%s","username":"%s","device":"%s","volume":%s,"allow_remote_mix":%s}' \
+			"$(json_escape "$server")" "$port" "$(json_escape "$group")" \
+			"$(json_escape "$password")" "$(json_escape "$username")" \
+			"$(json_escape "$device")" "$volume" "$allow_remote_mix")
+		( i=0
+		  while [ "$i" -lt 20 ]; do
+			[ -S "$SOCK" ] && break
+			sleep 1
+			i=$((i + 1))
+		  done
+		  "$PROG" --ctl "$json" >/dev/null 2>&1
+		) &
+	fi
+}
+
+stop_service() {
+	[ -S "$SOCK" ] && "$PROG" --ctl '{"cmd":"disconnect"}' >/dev/null 2>&1 || true
+	rm -f "$SOCK" /var/run/netlay.status /var/run/netlay.levels
+}
+
+reload_service() {
+	stop
+	start
+}
+
+service_triggers() {
+	procd_add_reload_trigger netlay
+}

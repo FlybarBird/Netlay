@@ -1,0 +1,328 @@
+--[[
+ @object-name: netlay
+ @object-desc: Netlay USB audio client (listen + remote mix target).
+
+ GL OpenResty wraps RPC methods in pcall. LuaJIT cannot yield across that,
+ so do not use ngx.pipe / ngx.sleep here — only blocking io.popen.
+]]
+
+local M = {}
+local cjson = require "cjson"
+
+local function exec(cmd)
+  local h = io.popen(cmd .. " 2>/dev/null")
+  if not h then return "" end
+  local data = h:read("*a") or ""
+  h:close()
+  return data
+end
+
+local function read_file(path)
+  local f = io.open(path, "r")
+  if not f then return nil end
+  local data = f:read("*a")
+  f:close()
+  return data
+end
+
+local function shell_quote(s)
+  s = tostring(s or "")
+  return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+local function json_str(s)
+  s = tostring(s or "")
+  s = s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n")
+  return '"' .. s .. '"'
+end
+
+local function uci_get(opt, default)
+  local v = exec("uci -q get netlay.main." .. opt)
+  v = (v or ""):gsub("%s+$", "")
+  if v == "" then return default end
+  return v
+end
+
+local function uci_set(opt, value)
+  if value == nil then return end
+  exec("uci -q set netlay.main." .. opt .. "=" .. shell_quote(tostring(value)))
+end
+
+local function sock_up()
+  local v = exec("test -S /var/run/netlay.ctl && echo yes")
+  return v:find("yes") ~= nil
+end
+
+local function ensure_running()
+  if sock_up() then return true end
+  exec("mkdir -p /var/run /tmp/run")
+  exec("/etc/init.d/netlay enable")
+  exec("/etc/init.d/netlay start")
+  if sock_up() then return true end
+  exec("/usr/bin/netlayd --udp-port 28780 --socket /var/run/netlay.ctl --device auto >/tmp/netlayd.log 2>&1 &")
+  return sock_up()
+end
+
+local function ctl(cmdjson)
+  ensure_running()
+  local out = exec("/usr/bin/netlayd --ctl " .. shell_quote(cmdjson))
+  out = (out or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  if out == "" then
+    local status = read_file("/var/run/netlay.status")
+    if status and status ~= "" then return status end
+    local log = read_file("/tmp/netlayd.log")
+    if log and log ~= "" then
+      return nil, "netlayd not running: " .. log:gsub("\n", " "):sub(1, 240)
+    end
+    return nil, "netlayd not running"
+  end
+  return out
+end
+
+local function json_decode(s)
+  if not s or s == "" then return nil end
+  local ok, data = pcall(cjson.decode, s)
+  if ok then return data end
+  return nil
+end
+
+local function decode_or_raw(out, err)
+  if not out then
+    return { ok = false, error = err or "netlayd not running", state = "stopped" }
+  end
+  local data = json_decode(out)
+  if data then return data end
+  return { ok = false, error = out }
+end
+
+local function card_label(idx)
+  local function readline(path)
+    local f = io.open(path, "r")
+    if not f then return nil end
+    local s = f:read("*l")
+    f:close()
+    if not s then return nil end
+    s = s:gsub("%s+$", ""):gsub("^%s+", "")
+    if s == "" then return nil end
+    return s
+  end
+  return readline("/sys/class/sound/card" .. idx .. "/device/../product")
+      or readline("/sys/class/sound/card" .. idx .. "/id")
+      or ("USB audio " .. idx)
+end
+
+local function parse_cards()
+  local cards, seen = {}, {}
+  local f = io.open("/proc/asound/cards", "r")
+  if f then
+    for line in f:lines() do
+      local idx, name, rest = line:match("^%s*(%d+)%s+%[([^%]]+)%]%s*:%s*(.*)")
+      if idx then
+        local label = card_label(idx)
+        local prod = rest and rest:match(" %- (.+)$")
+        if prod and prod ~= "" then label = prod:gsub("%s+$", "") end
+        if not tostring(label):find("[Dd]ummy") then
+          local id = "hw:" .. idx .. ",0"
+          if not seen[id] then
+            seen[id] = true
+            cards[#cards + 1] = { id = id, name = label }
+          end
+        end
+      end
+    end
+    f:close()
+  end
+  if #cards == 0 then
+    local listing = exec("ls /dev/snd/pcmC*D*p 2>/dev/null")
+    for path in (listing or ""):gmatch("[^\n]+") do
+      local card, dev = path:match("pcmC(%d+)D(%d+)p")
+      if card then
+        local id = "hw:" .. card .. "," .. dev
+        if not seen[id] then
+          seen[id] = true
+          cards[#cards + 1] = { id = id, name = card_label(card) }
+        end
+      end
+    end
+  end
+  return cards
+end
+
+local function prefer_named_devices(data)
+  local cards = parse_cards()
+  if not data.devices or not data.devices[1] then
+    data.devices = cards
+    return data
+  end
+  local by_id = {}
+  for _, c in ipairs(cards) do
+    by_id[c.id] = c.name
+  end
+  local out, seen = {}, {}
+  for _, d in ipairs(data.devices) do
+    local id = d.id or ""
+    if id ~= "" and not seen[id] then
+      seen[id] = true
+      local idx = id:match("hw:(%d+)")
+      d.name = by_id[id] or (idx and card_label(idx)) or d.name
+      if d.name and not tostring(d.name):find("^pcmC") then
+        out[#out + 1] = d
+      end
+    end
+  end
+  if #out == 0 then out = cards end
+  data.devices = out
+  return data
+end
+
+local function audio_info(cards)
+  exec("modprobe snd-usb-audio >/dev/null 2>&1")
+  local info = { snd_usb_audio = false, cards_file = false, hint = "" }
+  if read_file("/sys/module/snd_usb_audio/refcnt") then info.snd_usb_audio = true end
+  local cf = io.open("/proc/asound/cards", "r")
+  if cf then
+    info.cards_file = true
+    cf:close()
+  end
+  if cards and #cards > 0 then
+    info.hint = ""
+  elseif not info.cards_file then
+    info.hint = "Sound core is not loaded. Use Install audio packages on this page."
+  elseif not info.snd_usb_audio then
+    info.hint = "snd-usb-audio is not loaded. Use Install audio packages on this page."
+  else
+    info.hint = "USB audio module is loaded, but no ALSA card yet. SoundWire needs a USB-C-to-A adapter in the USB-A port, not the USB-C PD port."
+  end
+  return info
+end
+
+local function alsa_device(s)
+  s = tostring(s or "auto")
+  s = s:gsub("(%d)%.(%d)", "%1,%2")
+  return s
+end
+
+local function truthy(v)
+  v = tostring(v or "")
+  return v == "1" or v == "true" or v == "on" or v == "yes"
+end
+
+local function attach_uci(data)
+  data.uci = {
+    enabled = uci_get("enabled", "0"),
+    server = uci_get("server", "aoo.sonobus.net"),
+    port = uci_get("port", "10998"),
+    udp_port = uci_get("udp_port", "28780"),
+    group = uci_get("group", ""),
+    password = uci_get("password", ""),
+    username = uci_get("username", "Slate7"),
+    device = uci_get("device", "auto"),
+    volume = uci_get("volume", "0.8"),
+    allow_remote_mix = uci_get("allow_remote_mix", "1")
+  }
+  return data
+end
+
+function M.levels(args)
+  local raw = read_file("/var/run/netlay.levels")
+  local data = json_decode(raw)
+  if data then return data end
+  return { ok = true, peak_l = 0, peak_r = 0, rms_l = 0, rms_r = 0, clip = false, levels = { peak_l = 0, peak_r = 0, rms_l = 0, rms_r = 0, clip = false } }
+end
+
+function M.status(args)
+  local out, err = ctl('{"cmd":"status"}')
+  local data = decode_or_raw(out, err)
+  prefer_named_devices(data)
+  data.audio = audio_info(data.devices or {})
+  return attach_uci(data)
+end
+
+function M.devices(args)
+  exec("modprobe snd-usb-audio >/dev/null 2>&1")
+  local out, err = ctl('{"cmd":"devices"}')
+  local data = decode_or_raw(out, err)
+  prefer_named_devices(data)
+  data.audio = audio_info(data.devices or {})
+  if err and not out then data.daemon = false end
+  return data
+end
+
+function M.save(args)
+  args = args or {}
+  if args.server and args.server ~= "" then uci_set("server", args.server) end
+  if args.port and tostring(args.port) ~= "" then uci_set("port", args.port) end
+  if args.udp_port and tostring(args.udp_port) ~= "" then uci_set("udp_port", args.udp_port) end
+  if args.group ~= nil then uci_set("group", args.group) end
+  if args.password ~= nil then uci_set("password", args.password) end
+  if args.username and args.username ~= "" then uci_set("username", args.username) end
+  if args.device and args.device ~= "" then uci_set("device", alsa_device(args.device)) end
+  if args.volume ~= nil and tostring(args.volume) ~= "" then uci_set("volume", args.volume) end
+  if args.enabled and args.enabled ~= "" then uci_set("enabled", args.enabled) end
+  if args.allow_remote_mix ~= nil and tostring(args.allow_remote_mix) ~= "" then
+    uci_set("allow_remote_mix", truthy(args.allow_remote_mix) and "1" or "0")
+  end
+  exec("uci commit netlay")
+  return { ok = true }
+end
+
+function M.connect(args)
+  args = args or {}
+  M.save(args)
+  ensure_running()
+  local allow = truthy(args.allow_remote_mix ~= nil and args.allow_remote_mix or uci_get("allow_remote_mix", "1")) and "true" or "false"
+  local cmd = string.format(
+    '{"cmd":"connect","server":%s,"port":%s,"group":%s,"password":%s,"username":%s,"device":%s,"volume":%s,"allow_remote_mix":%s}',
+    json_str(args.server or uci_get("server", "aoo.sonobus.net")),
+    tostring(args.port or uci_get("port", "10998")),
+    json_str(args.group or uci_get("group", "")),
+    json_str(args.password or uci_get("password", "")),
+    json_str(args.username or uci_get("username", "Slate7")),
+    json_str(alsa_device(args.device or uci_get("device", "auto"))),
+    tostring(args.volume or uci_get("volume", "0.8")),
+    allow
+  )
+  local out, err = ctl(cmd)
+  return decode_or_raw(out, err)
+end
+
+function M.disconnect(args)
+  local out, err = ctl('{"cmd":"disconnect"}')
+  return decode_or_raw(out, err)
+end
+
+function M.volume(args)
+  args = args or {}
+  local v = args.value or args.volume or "0.8"
+  uci_set("volume", v)
+  exec("uci commit netlay")
+  local out, err = ctl('{"cmd":"volume","value":' .. tostring(v) .. "}")
+  return decode_or_raw(out, err)
+end
+
+function M.allow_remote_mix(args)
+  args = args or {}
+  local on = truthy(args.value or args.allow_remote_mix or "1")
+  uci_set("allow_remote_mix", on and "1" or "0")
+  exec("uci commit netlay")
+  local out, err = ctl('{"cmd":"allow_remote_mix","value":' .. (on and "true" or "false") .. "}")
+  return decode_or_raw(out, err)
+end
+
+function M.support(args)
+  local out = exec("/usr/libexec/netlay-install-support --status --json")
+  out = (out or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  local data = json_decode(out)
+  if data then return data end
+  return { ok = false, error = "support status unavailable", hint = out }
+end
+
+function M.install_support(args)
+  local out = exec("/usr/libexec/netlay-install-support --json")
+  out = (out or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  local data = json_decode(out)
+  if data then return data end
+  return { ok = false, error = "install-support failed", hint = out }
+end
+
+return M
