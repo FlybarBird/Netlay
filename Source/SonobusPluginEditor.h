@@ -6,6 +6,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "SonobusFeatures.h"
 
 #include "SonobusPluginProcessor.h"
 #include "SonoLookAndFeel.h"
@@ -14,16 +15,29 @@
 #include "SonoTextButton.h"
 #include "SonoUtility.h"
 #include "GenericItemChooser.h"
+#if SONOBUS_FEATURE_FX
 #include "CompressorView.h"
 #include "ExpanderView.h"
 #include "ParametricEqView.h"
+#endif
 #include "EffectParams.h"
 #include "ConnectView.h"
 #include "ChannelGroupsView.h"
 #include "PeersContainerView.h"
 #include "OptionsView.h"
+#include "AppShell.h"
+#include "ConnectPage.h"
+#include "PeersPage.h"
+#include "MixerPage.h"
+#include "RemoteControlPage.h"
+#include "SoundboardPage.h"
+#include "SettingsPage.h"
+#if SONOBUS_FEATURE_REVERB
 #include "ReverbView.h"
+#endif
+#if SONOBUS_FEATURE_VIDEO
 #include "VDONinjaView.h"
+#endif
 
 class RandomSentenceGenerator;
 class WaveformTransportComponent;
@@ -35,6 +49,7 @@ class ChatView;
 class SoundboardView;
 class LatencyMatchView;
 class SuggestNewGroupView;
+class VDONinjaView;
 
 //==============================================================================
 /**
@@ -84,7 +99,6 @@ public:
 
     void parentHierarchyChanged() override;
 
-    
     bool keyPressed (const KeyPress & key) override;
     bool keyStateChanged (bool isKeyDown) override;
     
@@ -190,8 +204,12 @@ private:
     void configEditor(TextEditor *editor, bool passwd = false);
 
     void showPatchbay(bool flag);
+#if SONOBUS_FEATURE_METRONOME
     void showMetConfig(bool flag);
+#endif
+#if SONOBUS_FEATURE_FX
     void showEffectsConfig(bool flag);
+#endif
 
     void showGroupMenu(bool show);
 
@@ -201,9 +219,13 @@ private:
     
     void showSettings(bool flag);
 
+#if SONOBUS_FEATURE_FX
     void showMonitorDelayView(bool flag);
+#endif
 
+#if SONOBUS_FEATURE_REVERB
     void showInputReverbView(bool flag);
+#endif
 
     void updateServerStatusLabel(const String & mesg, bool mainonly=true);
     void updateChannelState(bool force=false);
@@ -238,12 +260,16 @@ private:
     void showSuggestedGroupPrompt(const String & name, const String & group, const String & grouppass, bool ispublic, const StringArray & others);
     void showSuggestGroupView(bool show);
 
+#if SONOBUS_FEATURE_VIDEO
     void showVDONinjaView(bool show, bool fromVideoButton=true);
+#endif
     void copyGroupLink();
 
     void resetJitterBufferForAll();
 
+#if SONOBUS_FEATURE_RECORD
     void requestRecordDir(std::function<void (URL)> callback);
+#endif
     
     void updateSliderSnap();
 
@@ -251,8 +277,19 @@ private:
     void showSaveSettingsPreset();
     void showLoadSettingsPreset();
 
+#if SONOBUS_FEATURE_CHAT
     void showChatPanel(bool show, bool allowresize=true);
+#endif
     void showSoundboardPanel(bool show, bool allowresize=true);
+
+    void setupAppShell();
+    void ensureOptionsView();
+    void handleShellPageChanged(AppPage page);
+    void refreshShellHeader();
+    void applySlimChromeVisibility();
+    void layoutSlimPeersChrome();
+    void styleSlimButton (Button& button, bool primary);
+    void syncWindowKeyListener();
 
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
@@ -526,6 +563,19 @@ private:
     double serverStatusFadeTimestamp = 0;
 
     std::unique_ptr<Component> mTopLevelContainer;
+    std::unique_ptr<Component> mMasterBar;
+    std::unique_ptr<Label> mPeersHeading;
+    std::unique_ptr<TextButton> mAddChannelGroupButton;
+    std::unique_ptr<TextButton> mLatencyMatchButton;
+    std::unique_ptr<TextButton> mMeasureLatencyButton;
+    std::unique_ptr<TextButton> mPlayFileButton;
+    std::unique_ptr<AppShell> mAppShell;
+    std::unique_ptr<ConnectPage> mConnectPage;
+    std::unique_ptr<PeersPage> mPeersPage;
+    std::unique_ptr<MixerPage> mMixerPage;
+    std::unique_ptr<RemoteControlPage> mRemoteControlPage;
+    std::unique_ptr<SoundboardPage> mSoundboardPage;
+    std::unique_ptr<SettingsPage> mSettingsPage;
 
     std::unique_ptr<Viewport> mMainViewport;
     std::unique_ptr<Component> mMainContainer;
@@ -575,6 +625,17 @@ private:
     void addToRecentsSetups(const File & file);
 
     SonobusCommandManager commandManager { *this };
+
+    struct WindowKeyForwarder : public KeyListener
+    {
+        explicit WindowKeyForwarder (SonobusAudioProcessorEditor& e) : editor (e) {}
+        bool keyPressed (const KeyPress& key, Component*) override { return editor.keyPressed (key); }
+        bool keyStateChanged (bool isDown, Component*) override { return editor.keyStateChanged (isDown); }
+        SonobusAudioProcessorEditor& editor;
+    };
+
+    WindowKeyForwarder windowKeyForwarder { *this };
+    Component* windowKeyListenerTarget = nullptr;
 
     
     class SonobusMenuBarModel

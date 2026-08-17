@@ -3,14 +3,15 @@
 
 #include "PeersContainerView.h"
 #include "JitterBufferMeter.h"
+#include "SlimUi.h"
 #include <set>
 
 using namespace SonoAudio;
 
 PeerViewInfo::PeerViewInfo() : smallLnf(12), medLnf(14), sonoSliderLNF(12), panSliderLNF(12)
 {
-    bgColor = Colour::fromFloatRGBA(0.112f, 0.112f, 0.112f, 1.0f);
-    borderColor = Colour::fromFloatRGBA(0.5f, 0.5f, 0.5f, 0.3f);
+    bgColor = SlimUi::cardRaised();
+    borderColor = SlimUi::accentPurple().withAlpha (0.45f);
 
     sonoSliderLNF.textJustification = Justification::centredLeft;
     panSliderLNF.textJustification = Justification::centredLeft;
@@ -38,15 +39,28 @@ enum {
 
 void PeerViewInfo::paint(Graphics& g) 
 {
-    //g.fillAll (Colour(0xff111111));
-    //g.fillAll (Colour(0xff202020));
-    
     g.setColour(bgColor);
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), 6.0f);
+    g.fillRoundedRectangle(getLocalBounds().toFloat(), SlimUi::cardRadius);
 
-    g.setColour(borderColor);
-    g.drawRoundedRectangle(getLocalBounds().toFloat(), 6.0f, 0.5f);
+    g.setColour(SlimUi::outline());
+    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced (0.5f), SlimUi::cardRadius, 1.0f);
 
+    auto avatar = Rectangle<float> (12.0f, 14.0f, 36.0f, 36.0f);
+    g.setColour (SlimUi::accentBlue().withAlpha (0.28f));
+    g.fillEllipse (avatar);
+
+    auto initial = peerDisplayName.trim().substring (0, 1).toUpperCase();
+    if (initial.isEmpty())
+        initial = "?";
+    g.setColour (SlimUi::text());
+    g.setFont (SlimUi::displayBold (18.0f));
+    g.drawText (initial, avatar.toNearestInt(), Justification::centred);
+
+    auto dot = Rectangle<float> (avatar.getRight() - 11.0f, avatar.getBottom() - 11.0f, 10.0f, 10.0f);
+    g.setColour (peerOnline ? SlimUi::success() : SlimUi::textDim());
+    g.fillEllipse (dot);
+    g.setColour (SlimUi::cardRaised());
+    g.drawEllipse (dot.expanded (1.0f), 1.5f);
 }
 
 void PeerViewInfo::resized()
@@ -169,8 +183,8 @@ void PeerViewInfo::resized()
 
 PendingPeerViewInfo::PendingPeerViewInfo()
 {
-    bgColor = Colour::fromFloatRGBA(0.112f, 0.112f, 0.112f, 1.0f);
-    borderColor = Colour::fromFloatRGBA(0.5f, 0.5f, 0.5f, 0.3f);
+    bgColor = SlimUi::cardRaised();
+    borderColor = SlimUi::accentPurple().withAlpha (0.45f);
 
     //Random rcol;
     //itemColor = Colour::fromHSV(rcol.nextFloat(), 0.5f, 0.2f, 1.0f);
@@ -187,10 +201,10 @@ void PendingPeerViewInfo::paint(Graphics& g)
     //g.fillAll (Colour(0xff202020));
     
     g.setColour(bgColor);
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), 6.0f);
+    g.fillRoundedRectangle(getLocalBounds().toFloat(), 10.0f);
 
     g.setColour(borderColor);
-    g.drawRoundedRectangle(getLocalBounds().toFloat(), 6.0f, 0.5f);
+    g.drawRoundedRectangle(getLocalBounds().toFloat(), 10.0f, 1.0f);
 
 }
 
@@ -208,14 +222,14 @@ PeersContainerView::PeersContainerView(SonobusAudioProcessor& proc)
     regularTextColor = Colour(0xa0eeeeee);; //Colour(0xc0eeeeee);
     dimTextColor = Colour(0xa0aaaaaa); //Colour(0xc0aaaaaa);
     //soloColor = Colour::fromFloatRGBA(0.2, 0.5, 0.8, 1.0);
-    mutedColor = Colour::fromFloatRGBA(0.6, 0.3, 0.1, 1.0);
+    mutedColor = SlimUi::mute();
     soloColor = Colour::fromFloatRGBA(1.0, 1.0, 0.6, 1.0);
     mutedBySoloColor = Colour::fromFloatRGBA(0.25, 0.125, 0.0, 1.0);
     
     droppedTextColor = Colour(0xc0ee8888);
 
-    outlineColor = Colour::fromFloatRGBA(0.25, 0.25, 0.25, 1.0);
-    bgColor = Colours::black;
+    outlineColor = SlimUi::outline();
+    bgColor = SlimUi::background();
 
     peerModeFull = processor.getPeerDisplayMode() == SonobusAudioProcessor::PeerDisplayModeFull;
 
@@ -398,17 +412,7 @@ void PeersContainerView::showPopTip(const String & message, int timeoutMs, Compo
 
 void PeersContainerView::paint(Graphics & g)
 {    
-    //g.fillAll (Colours::black);
-    Rectangle<int> bounds = getLocalBounds();
-
-    bounds.reduce(1, 1);
-    bounds.removeFromLeft(3);
-    
-    g.setColour(bgColor);
-    g.fillRoundedRectangle(bounds.toFloat(), 6.0f);
-    g.setColour(outlineColor);
-    g.drawRoundedRectangle(bounds.toFloat(), 6.0f, 0.5f);
-
+    g.fillAll (Colours::transparentBlack);
 }
 
 PeerViewInfo * PeersContainerView::createPeerViewInfo()
@@ -441,6 +445,7 @@ PeerViewInfo * PeersContainerView::createPeerViewInfo()
     pvf->recvMutedButton->setColour(TextButton::buttonOnColourId, mutedColor);
     pvf->recvMutedButton->setTooltip(TRANS("Toggles receive muting, preventing audio from being heard for this user"));
 
+#if SONOBUS_FEATURE_PEER_SOLO
     pvf->recvSoloButton = std::make_unique<TextButton>(TRANS("SOLO"));
     pvf->recvSoloButton->addListener(this);
     pvf->recvSoloButton->setLookAndFeel(&pvf->medLnf);
@@ -448,6 +453,7 @@ PeerViewInfo * PeersContainerView::createPeerViewInfo()
     pvf->recvSoloButton->setColour(TextButton::buttonOnColourId, soloColor.withAlpha(0.7f));
     pvf->recvSoloButton->setColour(TextButton::textColourOnId, Colours::darkblue);
     pvf->recvSoloButton->setTooltip(TRANS("Listen to only this user, and other soloed users. Alt-click to exclusively solo this user."));
+#endif
 
     
     pvf->latActiveButton = std::make_unique<SonoDrawableButton>("", DrawableButton::ButtonStyle::ImageFitted);
@@ -858,7 +864,9 @@ void PeersContainerView::rebuildPeerViews()
         pvf->addAndMakeVisible(pvf->pingBg.get());
         //pvf->addAndMakeVisible(pvf->sendMutedButton.get());
         pvf->addAndMakeVisible(pvf->recvMutedButton.get());
+#if SONOBUS_FEATURE_PEER_SOLO
         pvf->addAndMakeVisible(pvf->recvSoloButton.get());
+#endif
         pvf->addAndMakeVisible(pvf->latActiveButton.get());
 
 
@@ -1314,7 +1322,7 @@ void PeersContainerView::updateLayout()
             }
 
             pvf->mainbox.flexDirection = FlexBox::Direction::row;
-            pvf->mainbox.items.add(FlexItem(3, 2));
+            pvf->mainbox.items.add(FlexItem(52, 2));
             pvf->mainbox.items.add(FlexItem(150, nbh, pvf->mainnarrowbox).withMargin(0).withFlex(1));
             //pvf->mainbox.items.add(FlexItem(2, 2));
             //pvf->mainbox.items.add(FlexItem(meterwidth, 50, *pvf->recvMeter).withMargin(3).withFlex(0));
@@ -1336,7 +1344,7 @@ void PeersContainerView::updateLayout()
             }
 
             pvf->mainbox.flexDirection = FlexBox::Direction::row;
-            pvf->mainbox.items.add(FlexItem(3, 2));
+            pvf->mainbox.items.add(FlexItem(52, 2));
             pvf->mainbox.items.add(FlexItem(150, nbh, pvf->mainnarrowbox).withMargin(0).withFlex(1));
             //pvf->mainbox.items.add(FlexItem(2, 2));
             //pvf->mainbox.items.add(FlexItem(meterwidth, 50, *pvf->recvMeter).withMargin(3).withFlex(0));
@@ -1645,6 +1653,8 @@ void PeersContainerView::updatePeerViews(int specific)
         pvf->channelGroups->setPeerMode(true, i);
 
         bool connected = processor.getRemotePeerConnected(i);
+        pvf->peerOnline = connected;
+        pvf->peerDisplayName = processor.getRemotePeerUserName(i);
         auto fullmode = pvf->fullMode;
 
         String hostname;
@@ -1860,7 +1870,7 @@ void PeersContainerView::updatePeerViews(int specific)
             }
             else {
 
-                ppvf->messageLabel->setText(TRANS("Could not connect with user, one or both of you may need to configure your internal firewall or network router to allow SonoBus to work between you. See the help documentation to enable port forwarding on your router."), dontSendNotification);
+                ppvf->messageLabel->setText(TRANS("Could not connect with user, one or both of you may need to configure your internal firewall or network router to allow Netlay to work between you. See the help documentation to enable port forwarding on your router."), dontSendNotification);
                 ppvf->removeButton->setVisible(true);
             }
         }
@@ -2034,6 +2044,7 @@ void PeersContainerView::buttonClicked (Button* buttonThatWasClicked)
             }
             return;
         }
+#if SONOBUS_FEATURE_PEER_SOLO
         else if (pvf->recvSoloButton.get() == buttonThatWasClicked) {
             if (ModifierKeys::currentModifiers.isAltDown()) {
                 // exclusive solo this one
@@ -2058,6 +2069,7 @@ void PeersContainerView::buttonClicked (Button* buttonThatWasClicked)
             }
             return;
         }
+#endif
 
         else if (pvf->latActiveButton.get() == buttonThatWasClicked) {
             SonobusAudioProcessor::LatencyInfo latinfo;

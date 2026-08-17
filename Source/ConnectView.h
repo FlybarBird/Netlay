@@ -5,6 +5,7 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "SonobusFeatures.h"
 
 #include "SonobusPluginProcessor.h"
 #include "SonoLookAndFeel.h"
@@ -12,7 +13,9 @@
 #include "SonoDrawableButton.h"
 #include "GenericItemChooser.h"
 
+#if SONOBUS_FEATURE_RANDOM_GROUP
 class RandomSentenceGenerator;
+#endif
 
 
 class ConnectView :
@@ -52,6 +55,13 @@ public:
 
     void grabInitialFocus();
     void escapePressed();
+
+    void setEmbeddedInShell (bool embedded);
+    bool isEmbeddedInShell() const { return mEmbeddedInShell; }
+
+    std::function<void()> onRequestDismiss;
+
+    void showDirectIpTab();
 
     void updateState();
     void updateLayout();
@@ -102,10 +112,13 @@ protected:
 
     AooServerConnectionInfo & currConnectionInfo;
     bool currConnected = false;
+    bool mEmbeddedInShell = false;
 
     bool firstTimeConnectShow = true;
 
+#if SONOBUS_FEATURE_RANDOM_GROUP
     std::unique_ptr<RandomSentenceGenerator> mRandomSentence;
+#endif
 
 
     std::unique_ptr<Label> mLocalAddressStaticLabel;
@@ -142,7 +155,9 @@ protected:
     std::unique_ptr<TextEditor> mServerGroupPasswordEditor;
     std::unique_ptr<SonoDrawableButton> mServerGroupPasswordShowButton;
 
+#if SONOBUS_FEATURE_RANDOM_GROUP
     std::unique_ptr<SonoDrawableButton> mServerGroupRandomButton;
+#endif
     std::unique_ptr<SonoDrawableButton> mServerPasteButton;
     std::unique_ptr<SonoDrawableButton> mServerCopyButton;
     std::unique_ptr<SonoDrawableButton> mServerShareButton;
@@ -155,6 +170,7 @@ protected:
 
     std::unique_ptr<TabbedComponent> mConnectTab;
     std::unique_ptr<Component> mDirectConnectContainer;
+    std::unique_ptr<Viewport> mDirectConnectViewport;
     std::unique_ptr<Viewport> mServerConnectViewport;
     std::unique_ptr<Component> mServerConnectContainer;
     std::unique_ptr<Viewport> mPublicServerConnectViewport;

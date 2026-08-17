@@ -4,11 +4,14 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "SonobusFeatures.h"
 
+#if SONOBUS_FEATURE_FX
 #include "faustCompressor.h"
 #include "faustExpander.h"
 #include "faustParametricEQ.h"
 #include "faustLimiter.h"
+#endif
 
 #include "EffectParams.h"
 
@@ -120,6 +123,7 @@ public:
 
     void commitAllParams();
     
+#if SONOBUS_FEATURE_FX
     void commitCompressorParams();
     void commitExpanderParams();
     void commitLimiterParams();
@@ -128,6 +132,15 @@ public:
 
     void setMonitoringDelayEnabled(bool enabled, int numchans);
     void setMonitoringDelayTimeMs(double delayms);
+#else
+    void commitCompressorParams() {}
+    void commitExpanderParams() {}
+    void commitLimiterParams() {}
+    void commitEqParams() {}
+    void commitMonitorDelayParams() {}
+    void setMonitoringDelayEnabled(bool, int) {}
+    void setMonitoringDelayTimeMs(double) {}
+#endif
 
     ChannelGroupParams params;
 
@@ -136,6 +149,7 @@ public:
     ProcessState inRevProcState;
     ProcessState revProcState;
 
+#if SONOBUS_FEATURE_FX
     // compressor (only used for 1 or 2 channel groups)
     std::unique_ptr<faustCompressor> compressor;
     std::unique_ptr<MapUI> compressorControl;
@@ -157,7 +171,6 @@ public:
     bool _lastEqEnabled = false;
 
     // limiter
-    //faustLimiter mInputLimiter;
     std::unique_ptr<faustCompressor> limiter;
     std::unique_ptr<MapUI>  limiterControl;
     bool limiterParamsChanged = false;
@@ -175,6 +188,7 @@ public:
     CriticalSection _monitorDelayLock;
 
     AudioBuffer<float> delayWorkBuffer;
+#endif
 
 
     double sampleRate = 48000.0;

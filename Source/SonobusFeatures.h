@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: GPLv3-or-later WITH Appstore-exception
+// Slim-fork feature switches. 1 = keep, 0 = remove.
+
+#pragma once
+
+#ifndef SONOBUS_FEATURE_CHAT
+#define SONOBUS_FEATURE_CHAT 0
+#endif
+
+#ifndef SONOBUS_FEATURE_FX
+#define SONOBUS_FEATURE_FX 0
+#endif
+
+#ifndef SONOBUS_FEATURE_REVERB
+#define SONOBUS_FEATURE_REVERB 0
+#endif
+
+#ifndef SONOBUS_FEATURE_RECORD
+#define SONOBUS_FEATURE_RECORD 0
+#endif
+
+#ifndef SONOBUS_FEATURE_METRONOME
+#define SONOBUS_FEATURE_METRONOME 0
+#endif
+
+#ifndef SONOBUS_FEATURE_VIDEO
+#define SONOBUS_FEATURE_VIDEO 0
+#endif
+
+#ifndef SONOBUS_FEATURE_UPDATER
+#define SONOBUS_FEATURE_UPDATER 0
+#endif
+
+#ifndef SONOBUS_FEATURE_I18N
+#define SONOBUS_FEATURE_I18N 0
+#endif
+
+#ifndef SONOBUS_FEATURE_PUBLIC_GROUPS
+#define SONOBUS_FEATURE_PUBLIC_GROUPS 0
+#endif
+
+#ifndef SONOBUS_FEATURE_RANDOM_GROUP
+#define SONOBUS_FEATURE_RANDOM_GROUP 0
+#endif
+
+#ifndef SONOBUS_FEATURE_PEER_SOLO
+#define SONOBUS_FEATURE_PEER_SOLO 0
+#endif
+
+#ifndef SONOBUS_FEATURE_PEER_PAN
+#define SONOBUS_FEATURE_PEER_PAN 0
+#endif

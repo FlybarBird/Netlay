@@ -5,6 +5,7 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "SonobusFeatures.h"
 
 #include "SonobusPluginProcessor.h"
 #include "SonoLookAndFeel.h"
@@ -125,6 +126,7 @@ protected:
     std::unique_ptr<ToggleButton> mOptionsUseSpecificUdpPortButton;
     std::unique_ptr<TextEditor>  mOptionsUdpPortEditor;
     std::unique_ptr<Label> mVersionLabel;
+    std::unique_ptr<Label> mCreditLabel;
     std::unique_ptr<ToggleButton> mOptionsChangeAllFormatButton;
 
     std::unique_ptr<ToggleButton> mOptionsHearLatencyButton;
@@ -134,6 +136,7 @@ protected:
     std::unique_ptr<ToggleButton> mOptionsShouldCheckForUpdateButton;
     std::unique_ptr<ToggleButton> mOptionsAutoReconnectButton;
     std::unique_ptr<ToggleButton> mOptionsSliderSnapToMouseButton;
+    std::unique_ptr<ToggleButton> mOptionsAllowRemoteMixButton;
     std::unique_ptr<ToggleButton> mOptionsAllowBluetoothInput;
     std::unique_ptr<ToggleButton> mOptionsDisableShortcutButton;
     std::unique_ptr<TextButton> mOptionsSavePluginDefaultButton;
@@ -180,6 +183,7 @@ protected:
     FlexBox optionsInputLimitBox;
     FlexBox optionsAutoReconnectBox;
     FlexBox optionsSnapToMouseBox;
+    FlexBox optionsAllowRemoteMixBox;
     FlexBox optionsDisableShortcutsBox;
     FlexBox optionsDefaultLevelBox;
     FlexBox optionsLanguageBox;

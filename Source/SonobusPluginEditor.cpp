@@ -10,17 +10,35 @@
 
 #include "PeersContainerView.h"
 #include "WaveformTransportComponent.h"
+#if SONOBUS_FEATURE_RANDOM_GROUP
 #include "RandomSentenceGenerator.h"
+#endif
 #include "SonoUtility.h"
 #include "SonobusTypes.h"
 #include "ChannelGroupsView.h"
+#if SONOBUS_FEATURE_FX
 #include "MonitorDelayView.h"
+#endif
+#if SONOBUS_FEATURE_CHAT
 #include "ChatView.h"
+#endif
+#if SONOBUS_FEATURE_VIDEO
+#include "VDONinjaView.h"
+#endif
 #include "SoundboardView.h"
+#if SONOBUS_FEATURE_UPDATER
 #include "AutoUpdater.h"
+#endif
 #include "LatencyMatchView.h"
 #include "SuggestNewGroupView.h"
 #include "SonoCallOutBox.h"
+#include "AppShell.h"
+#include "ConnectPage.h"
+#include "PeersPage.h"
+#include "MixerPage.h"
+#include "RemoteControlPage.h"
+#include "SoundboardPage.h"
+#include "SettingsPage.h"
 #include <sstream>
 
 #if JUCE_ANDROID
@@ -32,7 +50,9 @@
 
 enum {
     PeriodicUpdateTimerId = 0,
+#if SONOBUS_FEATURE_UPDATER
     CheckForNewVersionTimerId
+#endif
 };
 
 
@@ -45,6 +65,24 @@ enum {
 enum {
     PeerLayoutRadioGroupId = 1
 };
+
+namespace
+{
+    class SlimMasterBar : public Component
+    {
+    public:
+        void paint (Graphics& g) override
+        {
+            SlimUi::paintCard (g, getLocalBounds(), SlimUi::cardRadius);
+        }
+    };
+
+    void hideComponent (Component* c)
+    {
+        if (c != nullptr)
+            c->setVisible (false);
+    }
+}
 
 #define SONOBUS_SCHEME "sonobus"
 
@@ -346,7 +384,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
         currConnectionInfo.userName = lastusername;
     }
 
-    mTitleLabel = std::make_unique<Label>("title", TRANS("SonoBus"));
+    mTitleLabel = std::make_unique<Label>("title", TRANS("Netlay"));
     mTitleLabel->setFont(20);
     mTitleLabel->setAccessible(false);
     mTitleLabel->setColour(Label::textColourId, Colour(0xff47b0f8));
@@ -460,6 +498,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mInMonSoloAttachment = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramMainMonitorSolo, *mInSoloButton);
 
 
+#if SONOBUS_FEATURE_FX
     mMonDelayButton = std::make_unique<TextButton>("mondel");
     mMonDelayButton->setButtonText(TRANS("MON DELAY"));
     mMonDelayButton->setLookAndFeel(&smallLNF);
@@ -467,6 +506,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mMonDelayButton->setColour(TextButton::buttonOnColourId, Colour::fromFloatRGBA(0.6, 1.0, 0.6, 0.7f));
     mMonDelayButton->setColour(TextButton::textColourOnId, Colours::darkblue);
     mMonDelayButton->setTooltip(TRANS("Control additional self-monitoring delay, which can help mitigate synchronization with others"));
+#endif
 
     
     mMainMuteButton = std::make_unique<SonoDrawableButton>("sendmute", DrawableButton::ButtonStyle::ImageFitted);
@@ -514,16 +554,22 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
 #endif
     mMainPushToTalkButton->setTooltip(pttmessage);
     
+#if SONOBUS_FEATURE_METRONOME
     mMetContainer = std::make_unique<Component>();
+#endif
+#if SONOBUS_FEATURE_FX
     mEffectsContainer = std::make_unique<Component>();
+#endif
 
     
-    
+
+#if SONOBUS_FEATURE_METRONOME
     mMetButtonBg = std::make_unique<DrawableRectangle>();
     mMetButtonBg->setCornerSize(Point<float>(8,8));
     mMetButtonBg->setFill (Colour::fromFloatRGBA(0.0, 0.0, 0.0, 1.0));
     mMetButtonBg->setStrokeFill (Colour::fromFloatRGBA(0.5, 0.5, 0.5, 0.25));
     mMetButtonBg->setStrokeThickness(0.5);
+#endif
 
     mDragDropBg = std::make_unique<DrawableRectangle>();
     mDragDropBg->setFill (Colour::fromFloatRGBA(0.5, 0.5, 0.5, 0.2));
@@ -535,6 +581,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mFileAreaBg->setStrokeThickness(0.5);
     
     
+#if SONOBUS_FEATURE_METRONOME
     mMetEnableButton = std::make_unique<SonoDrawableButton>("metenable", DrawableButton::ButtonStyle::ImageFitted);
     std::unique_ptr<Drawable> metimg(Drawable::createFromImageData(BinaryData::met_svg, BinaryData::met_svgSize));
     mMetEnableButton->setImages(metimg.get(), nullptr, nullptr, nullptr, nullptr);
@@ -616,6 +663,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mMetSyncFileButton->setColour(TextButton::buttonOnColourId, Colour::fromFloatRGBA(0.6, 1.0, 0.6, 0.7f));
     mMetSyncFileButton->setColour(TextButton::textColourOnId, Colours::darkblue);
     mMetSyncFileButton->setTooltip(TRANS("Synchronize metronome start with file playback"));
+#endif
 
     
     mDrySlider     = std::make_unique<Slider>(Slider::LinearHorizontal,  Slider::TextBoxAbove);
@@ -679,24 +727,34 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mMainSendMuteAttachment = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramMainSendMute, *mMainMuteButton);
     mMainRecvMuteAttachment = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramMainRecvMute, *mMainRecvMuteButton);
 
+#if SONOBUS_FEATURE_METRONOME
     mMetEnableAttachment = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramMetEnabled, *mMetEnableButton);
     mMetLevelAttachment     = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramMetGain, *mMetLevelSlider);
     mMetTempoAttachment     = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramMetTempo, *mMetTempoSlider);
     mMetSendAttachment = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramSendMetAudio, *mMetSendButton);
     mMetSyncAttachment = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramSyncMetToHost, *mMetSyncButton);
     mMetSyncFileAttachment = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramSyncMetToFilePlayback, *mMetSyncFileButton);
+#endif
 
     
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramMainSendMute, this);
+#if SONOBUS_FEATURE_METRONOME
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramMetEnabled, this);
+#endif
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramMainRecvMute, this);
+#if SONOBUS_FEATURE_METRONOME
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramSendMetAudio, this);
+#endif
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramSendFileAudio, this);
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramSendSoundboardAudio, this);
     //processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramHearLatencyTest, this);
+#if SONOBUS_FEATURE_METRONOME
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramMetIsRecorded, this);
+#endif
+#if SONOBUS_FEATURE_REVERB
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramMainReverbModel, this);
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramMainReverbEnabled, this);
+#endif
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramSendChannels, this);
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramInMonitorMonoPan, this);
     processor.getValueTreeState().addParameterListener (SonobusAudioProcessor::paramInMonitorPan1, this);
@@ -706,9 +764,9 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mConnectButton = std::make_unique<SonoTextButton>("directconnect");
     mConnectButton->setButtonText(TRANS("Connect..."));
     mConnectButton->addListener(this);
-    mConnectButton->setColour(TextButton::buttonColourId, Colour::fromFloatRGBA(0.1, 0.4, 0.6, 0.6));
-    mConnectButton->setColour(TextButton::buttonOnColourId, Colour::fromFloatRGBA(0.6, 0.4, 0.6, 0.6));
-    mConnectButton->setColour(SonoTextButton::outlineColourId, Colour::fromFloatRGBA(0.5, 0.5, 0.5, 0.4));
+    mConnectButton->setColour(TextButton::buttonColourId, SlimUi::accentBlue());
+    mConnectButton->setColour(TextButton::buttonOnColourId, SlimUi::accentPurple());
+    mConnectButton->setColour(SonoTextButton::outlineColourId, SlimUi::outline());
     mConnectButton->setTextJustification(Justification::centred);
 
 
@@ -722,6 +780,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mAltConnectButton->setTitle(TRANS("Connect to Other"));
 
 
+#if SONOBUS_FEATURE_VIDEO
     mVideoButton = std::make_unique<SonoDrawableButton>("vid", DrawableButton::ButtonStyle::ImageOnButtonBackground);
     std::unique_ptr<Drawable> vidimg(Drawable::createFromImageData(BinaryData::videocamoutline_svg, BinaryData::videocamoutline_svgSize));
     mVideoButton->setImages(vidimg.get(), nullptr, nullptr, nullptr, nullptr);
@@ -731,6 +790,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mVideoButton->onClick = [this] {
         showVDONinjaView(true);
     };
+#endif
 
     mMainStatusLabel = std::make_unique<Label>("servstat", "");
     mMainStatusLabel->setJustificationType(Justification::centredRight);
@@ -797,6 +857,27 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
 
 
     mTopLevelContainer = std::make_unique<Component>();
+    mMasterBar = std::make_unique<SlimMasterBar>();
+    mPeersHeading = std::make_unique<Label> ("peershead", TRANS("Peers"));
+    mPeersHeading->setFont (SlimUi::displayBold (22.0f));
+    mPeersHeading->setColour (Label::textColourId, SlimUi::text());
+    mPeersHeading->setJustificationType (Justification::centredLeft);
+
+    mAddChannelGroupButton = std::make_unique<TextButton> ("addgroup");
+    mAddChannelGroupButton->setButtonText (TRANS("+ Add Channel Group"));
+    mAddChannelGroupButton->addListener (this);
+
+    mLatencyMatchButton = std::make_unique<TextButton> ("latmatch");
+    mLatencyMatchButton->setButtonText (TRANS("Latency Match"));
+    mLatencyMatchButton->addListener (this);
+
+    mMeasureLatencyButton = std::make_unique<TextButton> ("latmeasure");
+    mMeasureLatencyButton->setButtonText (TRANS("Measure Latency"));
+    mMeasureLatencyButton->addListener (this);
+
+    mPlayFileButton = std::make_unique<TextButton> ("playfile");
+    mPlayFileButton->setButtonText (TRANS("Play File to Group"));
+    mPlayFileButton->addListener (this);
 
 
     mMainContainer = std::make_unique<Component>();
@@ -814,6 +895,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     //mInputChannelsViewport->setViewedComponent(mInputChannelsContainer.get(), false);
     //mMainContainer->addChildComponent(mInputChannelsViewport.get());
 
+#if SONOBUS_FEATURE_CHAT
     mChatView = std::make_unique<ChatView>(processor, currConnectionInfo);
     mChatView->setVisible(false);
     mChatView->addComponentListener(this);
@@ -844,6 +926,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mChatSizeConstrainer = std::make_unique<ComponentBoundsConstrainer>();
     mChatSizeConstrainer->setSizeLimits(180, 100, 1200, 10000);
     mChatEdgeResizer = std::make_unique<ResizableEdgeComponent>(mChatView.get(), mChatSizeConstrainer.get(), ResizableEdgeComponent::leftEdge);
+#endif
 
 
     File supportDir = processor.getSupportDir();
@@ -865,12 +948,10 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     std::unique_ptr<Drawable> soundboardimg(Drawable::createFromImageData(BinaryData::soundboard_svg, BinaryData::soundboard_svgSize));
     mSoundboardButton->setImages(soundboardimg.get());
     mSoundboardButton->onClick = [this]() {
-        bool newshown = !mSoundboardView->isVisible();
-        // hide chat if shown, if the window is already small
-        if (newshown && mChatView->isVisible() && getWidth() < 800) {
-            this->showChatPanel(false, false);
-        }
-        this->showSoundboardPanel(newshown);
+        if (mAppShell)
+            mAppShell->setPage (AppPage::Soundboard);
+        else
+            this->showSoundboardPanel (! mSoundboardView->isVisible());
         resized();
     };
     mSoundboardButton->setColour(DrawableButton::backgroundOnColourId, Colour::fromFloatRGBA(0.2, 0.2, 0.2, 0.7));
@@ -888,12 +969,14 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
 
     // effects
     
+#if SONOBUS_FEATURE_FX
     mEffectsButton = std::make_unique<TextButton>("mainfx");
     mEffectsButton->setButtonText(TRANS("FX"));
     mEffectsButton->setTitle(TRANS("Main Effects"));
     mEffectsButton->setLookAndFeel(&smallLNF);
     mEffectsButton->addListener(this);
     mEffectsButton->setColour(TextButton::buttonOnColourId, Colour::fromFloatRGBA(0.2, 0.5, 0.7, 0.5));
+#endif
 
     mBufferMinButton = std::make_unique<SonoDrawableButton>("", DrawableButton::ButtonStyle::ImageFitted);
     std::unique_ptr<Drawable> backimg(Drawable::createFromImageData(BinaryData::reset_buffer_icon_svg, BinaryData::reset_buffer_icon_svgSize));
@@ -920,6 +1003,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
 
 
     
+#if SONOBUS_FEATURE_REVERB
     mReverbHeaderBg = std::make_unique<DrawableRectangle>();
     mReverbHeaderBg->setCornerSize(Point<float>(6,6));
     mReverbHeaderBg->setFill (Colour::fromFloatRGBA(0.07, 0.07, 0.07, 1.0));
@@ -1024,16 +1108,20 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mReverbPreDelaySlider->setWantsKeyboardFocus(true);
 
     mReverbPreDelayAttachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramMainReverbPreDelay, *mReverbPreDelaySlider);
+#endif
 
     
     mIAAHostButton = std::make_unique<SonoDrawableButton>("iaa", DrawableButton::ButtonStyle::ImageFitted);
     mIAAHostButton->addListener(this);
 
     
+#if SONOBUS_FEATURE_RECORD
     mPeerRecImage = Drawable::createFromImageData(BinaryData::rectape_svg, BinaryData::rectape_svgSize);
     mPeerRecImage->setInterceptsMouseClicks(false, false);
+#endif
 
     {
+#if SONOBUS_FEATURE_RECORD
         mRecordingButton = std::make_unique<SonoDrawableButton>("record", DrawableButton::ButtonStyle::ImageFitted);
         std::unique_ptr<Drawable> recimg(Drawable::createFromImageData(BinaryData::record_svg, BinaryData::record_svgSize));
         std::unique_ptr<Drawable> recselimg(Drawable::createFromImageData(BinaryData::record_active_alt_svg, BinaryData::record_active_alt_svgSize));
@@ -1049,6 +1137,7 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
         mFileRecordingLabel->setFont(12);
         mFileRecordingLabel->setColour(Label::textColourId, Colour(0x88ffbbbb));
         mFileRecordingLabel->setAccessible(false);
+#endif
 
         mFileBrowseButton = std::make_unique<SonoDrawableButton>("browse", DrawableButton::ButtonStyle::ImageFitted);
         std::unique_ptr<Drawable> folderimg(Drawable::createFromImageData(BinaryData::folder_icon_svg, BinaryData::folder_icon_svgSize));
@@ -1163,7 +1252,9 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mTopLevelContainer->addAndMakeVisible(mMainUserLabel.get());
     mTopLevelContainer->addAndMakeVisible(mMainPersonImage.get());
     mTopLevelContainer->addAndMakeVisible(mMainGroupImage.get());
+#if SONOBUS_FEATURE_RECORD
     mTopLevelContainer->addChildComponent(mPeerRecImage.get());
+#endif
     mTopLevelContainer->addAndMakeVisible(mPeerLayoutFullButton.get());
     mTopLevelContainer->addAndMakeVisible(mPeerLayoutMinimalButton.get());
 
@@ -1182,20 +1273,29 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mTopLevelContainer->addAndMakeVisible (mSettingsButton.get());
     mTopLevelContainer->addAndMakeVisible(mConnectButton.get());
     mTopLevelContainer->addChildComponent(mAltConnectButton.get());
+#if SONOBUS_FEATURE_VIDEO
     mTopLevelContainer->addChildComponent(mVideoButton.get());
+#endif
     mTopLevelContainer->addAndMakeVisible(mMainStatusLabel.get());
     mTopLevelContainer->addAndMakeVisible(mConnectionTimeLabel.get());
 
     mTopLevelContainer->addChildComponent(mSetupAudioButton.get());
 
     
+#if SONOBUS_FEATURE_METRONOME
     mTopLevelContainer->addAndMakeVisible(mMetButtonBg.get());
+#endif
     mTopLevelContainer->addAndMakeVisible(mFileAreaBg.get());
+#if SONOBUS_FEATURE_METRONOME
     mTopLevelContainer->addAndMakeVisible(mMetEnableButton.get());
     mTopLevelContainer->addAndMakeVisible(mMetConfigButton.get());
+#endif
+#if SONOBUS_FEATURE_FX
     mTopLevelContainer->addAndMakeVisible(mEffectsButton.get());
+#endif
     mTopLevelContainer->addAndMakeVisible(mBufferMinButton.get());
 
+#if SONOBUS_FEATURE_METRONOME
     mMetContainer->addAndMakeVisible(mMetLevelSlider.get());
     mMetContainer->addAndMakeVisible(mMetTempoSlider.get());
     mMetContainer->addAndMakeVisible(mMetLevelSliderLabel.get());
@@ -1206,7 +1306,9 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     if (!JUCEApplicationBase::isStandaloneApp()) {
         mMetContainer->addAndMakeVisible(mMetSyncButton.get());
     }
+#endif
 
+#if SONOBUS_FEATURE_FX && SONOBUS_FEATURE_REVERB
     mEffectsContainer->addAndMakeVisible(mReverbHeaderBg.get());
     mEffectsContainer->addAndMakeVisible(mReverbTitleLabel.get());
     mEffectsContainer->addAndMakeVisible(mReverbEnabledButton.get());
@@ -1219,10 +1321,13 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mEffectsContainer->addAndMakeVisible(mReverbDampingSlider.get());
     mEffectsContainer->addAndMakeVisible(mReverbPreDelayLabel.get());
     mEffectsContainer->addAndMakeVisible(mReverbPreDelaySlider.get());
+#endif
     
     
 
+#if SONOBUS_FEATURE_CHAT
     mTopLevelContainer->addAndMakeVisible(mChatButton.get());
+#endif
     mTopLevelContainer->addAndMakeVisible(mSoundboardButton.get());
 
     
@@ -1230,10 +1335,12 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     mTopLevelContainer->addChildComponent(mIAAHostButton.get());
 
 
-    if (mRecordingButton) {
+    if (mPlayButton) {
+#if SONOBUS_FEATURE_RECORD
         mTopLevelContainer->addAndMakeVisible(mRecordingButton.get());
-        mTopLevelContainer->addAndMakeVisible(mFileBrowseButton.get());
         mTopLevelContainer->addAndMakeVisible(mFileRecordingLabel.get());
+#endif
+        mTopLevelContainer->addAndMakeVisible(mFileBrowseButton.get());
         mTopLevelContainer->addChildComponent(mPlayButton.get());
         mTopLevelContainer->addChildComponent(mSkipBackButton.get());
         mTopLevelContainer->addChildComponent(mLoopButton.get());
@@ -1258,16 +1365,22 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     //addAndMakeVisible (mSendChannelsLabel.get());
 
 
+#if SONOBUS_FEATURE_CHAT
     mTopLevelContainer->addChildComponent(mChatView.get());
     mChatView->addAndMakeVisible(mChatEdgeResizer.get());
+#endif
 
-    mTopLevelContainer->addChildComponent(mSoundboardView.get());
-    mSoundboardView->addAndMakeVisible(mSoundboardEdgeResizer.get());
+    mTopLevelContainer->addAndMakeVisible (mMasterBar.get());
+    mTopLevelContainer->addAndMakeVisible (mPeersHeading.get());
+    mTopLevelContainer->addAndMakeVisible (mAddChannelGroupButton.get());
+    mTopLevelContainer->addAndMakeVisible (mLatencyMatchButton.get());
+    mTopLevelContainer->addAndMakeVisible (mMeasureLatencyButton.get());
+    mTopLevelContainer->addAndMakeVisible (mPlayFileButton.get());
+    mMasterBar->toBack();
 
+    setupAppShell();
 
-    addAndMakeVisible(mTopLevelContainer.get());
-
-    addChildComponent(mConnectView.get());
+    addAndMakeVisible(mAppShell.get());
 
     // over everything
     addChildComponent(mDragDropBg.get());
@@ -1359,13 +1472,17 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
     commandManager.commandStatusChanged();
     
     setWantsKeyboardFocus(true);
+    setFocusContainerType (FocusContainerType::keyboardFocusContainer);
+    syncWindowKeyListener();
     
     startTimer(PeriodicUpdateTimerId, 1000);
 
+#if SONOBUS_FEATURE_UPDATER
 #if (JUCE_WINDOWS || JUCE_MAC)
     if (JUCEApplicationBase::isStandaloneApp()) {
         startTimer(CheckForNewVersionTimerId, 5000);
     }
+#endif
 #endif
 
    // Make sure that before the constructor has finished, you've set the
@@ -1383,6 +1500,19 @@ SonobusAudioProcessorEditor::SonobusAudioProcessorEditor (SonobusAudioProcessor&
 
 }
 
+#if !SONOBUS_FEATURE_CHAT
+#include "ChatView.h"
+#endif
+#if !SONOBUS_FEATURE_FX
+#include "MonitorDelayView.h"
+#endif
+#if !SONOBUS_FEATURE_VIDEO
+#include "VDONinjaView.h"
+#endif
+#if !SONOBUS_FEATURE_RANDOM_GROUP
+#include "RandomSentenceGenerator.h"
+#endif
+
 SonobusAudioProcessorEditor::~SonobusAudioProcessorEditor()
 {
     if (menuBarModel) {
@@ -1399,15 +1529,23 @@ SonobusAudioProcessorEditor::~SonobusAudioProcessorEditor()
     popTip.reset();
     
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramMainSendMute, this);
+#if SONOBUS_FEATURE_METRONOME
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramMetEnabled, this);
+#endif
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramMainRecvMute, this);
+#if SONOBUS_FEATURE_METRONOME
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramSendMetAudio, this);
+#endif
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramSendFileAudio, this);
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramSendSoundboardAudio, this);
     //processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramHearLatencyTest, this);
+#if SONOBUS_FEATURE_METRONOME
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramMetIsRecorded, this);
+#endif
+#if SONOBUS_FEATURE_REVERB
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramMainReverbModel, this);
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramMainReverbEnabled, this);
+#endif
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramSendChannels, this);
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramInMonitorMonoPan, this);
     processor.getValueTreeState().removeParameterListener (SonobusAudioProcessor::paramInMonitorPan1, this);
@@ -1420,6 +1558,13 @@ SonobusAudioProcessorEditor::~SonobusAudioProcessorEditor()
     
     if (mWaveformThumbnail) {
         mWaveformThumbnail->removeChangeListener (this);
+    }
+
+    if (windowKeyListenerTarget != nullptr)
+    {
+        windowKeyListenerTarget->removeKeyListener (commandManager.getKeyMappings());
+        windowKeyListenerTarget->removeKeyListener (&windowKeyForwarder);
+        windowKeyListenerTarget = nullptr;
     }
 
 }
@@ -1479,6 +1624,7 @@ void SonobusAudioProcessorEditor::updateUseKeybindings()
         addKeyListener (commandManager.getKeyMappings());
     }
 
+    syncWindowKeyListener();
 }
 
 void SonobusAudioProcessorEditor::connectionsChanged(ConnectView *comp)
@@ -1722,9 +1868,11 @@ void SonobusAudioProcessorEditor::aooClientPeerChangedState(SonobusAudioProcesso
 
 void SonobusAudioProcessorEditor::sbChatEventReceived(SonobusAudioProcessor *comp, const SBChatEvent & mesg)
 {
+#if SONOBUS_FEATURE_CHAT
     haveNewChatEvents = true;
 
     triggerAsyncUpdate();
+#endif
 }
 
 void SonobusAudioProcessorEditor::peerRequestedLatencyMatch(SonobusAudioProcessor *comp, const String & username, float latency)
@@ -1765,10 +1913,13 @@ void SonobusAudioProcessorEditor::peerBlockedInfoChanged(SonobusAudioProcessor *
 
 void SonobusAudioProcessorEditor::choiceButtonSelected(SonoChoiceButton *comp, int index, int ident)
 {
+#if SONOBUS_FEATURE_REVERB
     if (comp == mReverbModelChoice.get()) {
         processor.setMainReverbModel((SonobusAudioProcessor::ReverbModel) ident);
     }
-    else if (comp == mSendChannelsChoice.get()) {
+    else
+#endif
+    if (comp == mSendChannelsChoice.get()) {
         float fval = processor.getValueTreeState().getParameter(SonobusAudioProcessor::paramSendChannels)->convertTo0to1(ident);
         processor.getValueTreeState().getParameter(SonobusAudioProcessor::paramSendChannels)->setValueNotifyingHost(fval);
         updateLayout();
@@ -1879,13 +2030,17 @@ void SonobusAudioProcessorEditor::timerCallback(int timerid)
             serverStatusFadeTimestamp = 0.0;
         }
         
+#if SONOBUS_FEATURE_RECORD
         if (processor.isRecordingToFile() && mFileRecordingLabel) {
             mFileRecordingLabel->setText(SonoUtility::durationToString(processor.getElapsedRecordTime(), true), dontSendNotification);
         }
+#endif
 
         if (processor.isConnectedToServer() && processor.getCurrentJoinedGroup().isNotEmpty()) {
             mConnectionTimeLabel->setText(SonoUtility::durationToString(processor.getElapsedConnectedTime(), true), dontSendNotification);
             mConnectionTimeLabel->setEnabled(true);
+            if (mAppShell)
+                refreshShellHeader();
         }
 
         if (!tooltipWindow && getParentComponent()) {
@@ -1905,23 +2060,30 @@ void SonobusAudioProcessorEditor::timerCallback(int timerid)
             mConnectButton->grabKeyboardFocus();
         }
 
+#if SONOBUS_FEATURE_CHAT
         if (processor.getLastChatShown() != mChatView->isVisible()) {
             showChatPanel(processor.getLastChatShown(), false);
             resized();
         }
-        else if (processor.getLastSoundboardShown() != mSoundboardView->isVisible()) {
+        else
+#endif
+        if (processor.getLastSoundboardShown() != mSoundboardView->isVisible() && mAppShell == nullptr) {
             showSoundboardPanel(processor.getLastSoundboardShown(), false);
             resized();
         }
 
+#if SONOBUS_FEATURE_CHAT
         mChatButton->setToggleState(mChatView->haveNewSinceLastView(), dontSendNotification);
+#endif
 
+#if SONOBUS_FEATURE_RECORD
         auto anyrec = processor.isAnyRemotePeerRecording() || processor.isRecordingToFile();
         if (mPeerRecImage->isVisible() != anyrec) {
             mPeerRecImage->setVisible(anyrec);
             mPeerRecImage->repaint();
             resized();
         }
+#endif
 
 #if 0
         if (JUCEApplicationBase::isStandaloneApp() && getAudioDeviceManager())
@@ -1955,6 +2117,7 @@ void SonobusAudioProcessorEditor::timerCallback(int timerid)
         }
 #endif
     }
+#if SONOBUS_FEATURE_UPDATER
     else if (timerid == CheckForNewVersionTimerId) {
         if (getShouldCheckForNewVersionValue) {
             Value * val = getShouldCheckForNewVersionValue();
@@ -1965,6 +2128,7 @@ void SonobusAudioProcessorEditor::timerCallback(int timerid)
         }
         stopTimer(CheckForNewVersionTimerId);
     }
+#endif
 }
 
 
@@ -2025,7 +2189,14 @@ void SonobusAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
         
     }
     else if (buttonThatWasClicked == mSetupAudioButton.get()) {
-        if (!settingsCalloutBox) {
+        if (mAppShell) {
+            mAppShell->setPage (AppPage::Settings);
+            ensureOptionsView();
+            mSettingsPage->setOptionsView (mOptionsView.get());
+            mOptionsView->showAudioTab();
+            mOptionsView->updateState();
+        }
+        else if (!settingsCalloutBox) {
             showSettings(true);
             if (mOptionsView) {
                 mOptionsView->showAudioTab();
@@ -2046,6 +2217,20 @@ void SonobusAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
         resized();
 
     }
+    else if (buttonThatWasClicked == mAddChannelGroupButton.get()) {
+        mInputChannelsContainer->setVisible (true);
+        mInputChannelsContainer->rebuildChannelViews();
+        mInputChannelsContainer->addGroupPressed();
+        resized();
+    }
+    else if (buttonThatWasClicked == mLatencyMatchButton.get()
+             || buttonThatWasClicked == mMeasureLatencyButton.get()) {
+        showLatencyMatchView (true);
+    }
+    else if (buttonThatWasClicked == mPlayFileButton.get() && mFileBrowseButton) {
+        buttonClicked (mFileBrowseButton.get());
+    }
+#if SONOBUS_FEATURE_METRONOME
     else if (buttonThatWasClicked == mMetConfigButton.get()) {
         if (!metCalloutBox) {
             showMetConfig(true);
@@ -2053,6 +2238,8 @@ void SonobusAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
             showMetConfig(false);
         }        
     }
+#endif
+#if SONOBUS_FEATURE_FX
     else if (buttonThatWasClicked == mEffectsButton.get()) {
         if (!effectsCalloutBox) {
             showEffectsConfig(true);
@@ -2060,6 +2247,7 @@ void SonobusAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
             showEffectsConfig(false);
         }        
     }
+#endif
     else if (buttonThatWasClicked == mBufferMinButton.get()) {
         resetJitterBufferForAll();
     }
@@ -2072,6 +2260,7 @@ void SonobusAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
             showPopTip(TRANS("Sending your audio to others"), 3000, mMainMuteButton.get());
         }
     }
+#if SONOBUS_FEATURE_FX
     else if (buttonThatWasClicked == mMonDelayButton.get()) {
         if (!monDelayCalloutBox) {
             showMonitorDelayView(true);
@@ -2079,6 +2268,7 @@ void SonobusAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
             showMonitorDelayView(false);
         }
     }
+#endif
     else if (buttonThatWasClicked == mInSoloButton.get()) {
         if (ModifierKeys::currentModifiers.isAltDown()) {
             // exclusive solo this one
@@ -2099,6 +2289,7 @@ void SonobusAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
             }
         }
     }
+#if SONOBUS_FEATURE_METRONOME
     else if (buttonThatWasClicked == mMetSendButton.get()) {
         // handled by button attachment
         if (mMetSendButton->isVisible()) {
@@ -2109,6 +2300,7 @@ void SonobusAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
             }
         }
     }
+#endif
     else if (buttonThatWasClicked == mFileSendAudioButton.get()) {
         // handled by button attachment
         if (mFileSendAudioButton->isVisible()) {
@@ -2146,6 +2338,7 @@ void SonobusAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
             switchToHostApplication();
         }
     }
+#if SONOBUS_FEATURE_RECORD
     else if (buttonThatWasClicked == mRecordingButton.get()) {
         if (processor.isRecordingToFile()) {
             processor.stopRecordingToFile();
@@ -2320,6 +2513,7 @@ void SonobusAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 
         }
     }
+#endif
     else if (buttonThatWasClicked == mFileBrowseButton.get()) {
         if (mFileChooser.get() == nullptr) {
 
@@ -2423,6 +2617,7 @@ void SonobusAudioProcessorEditor::resetJitterBufferForAll()
 }
 
 
+#if SONOBUS_FEATURE_RECORD
 void SonobusAudioProcessorEditor::requestRecordDir(std::function<void (URL)> callback)
 {
     SafePointer<SonobusAudioProcessorEditor> safeThis (this);
@@ -2491,6 +2686,8 @@ void SonobusAudioProcessorEditor::requestRecordDir(std::function<void (URL)> cal
                     
     }, nullptr);
 }
+
+#endif
 
 void SonobusAudioProcessorEditor::openFileBrowser()
 {
@@ -2884,6 +3081,7 @@ void SonobusAudioProcessorEditor::connectWithInfo(const AooServerConnectionInfo 
 
 
 
+#if SONOBUS_FEATURE_METRONOME
 void SonobusAudioProcessorEditor::showMetConfig(bool flag)
 {
     
@@ -2931,7 +3129,9 @@ void SonobusAudioProcessorEditor::showMetConfig(bool flag)
         }
     }
 }
+#endif
 
+#if SONOBUS_FEATURE_FX
 void SonobusAudioProcessorEditor::showEffectsConfig(bool flag)
 {
     
@@ -2982,6 +3182,7 @@ void SonobusAudioProcessorEditor::showEffectsConfig(bool flag)
         }
     }
 }
+#endif
 
 
 void SonobusAudioProcessorEditor::showPatchbay(bool flag)
@@ -3058,10 +3259,12 @@ void SonobusAudioProcessorEditor::showLatencyMatchView(bool show)
         mLatMatchView->startLatMatchProcess();
 
 
-        Rectangle<int> bounds =  dw->getLocalArea(nullptr, mMainLinkButton->getScreenBounds());
+        auto anchor = (mAppShell && mLatencyMatchButton) ? mLatencyMatchButton->getScreenBounds()
+                                                         : mMainLinkButton->getScreenBounds();
+        Rectangle<int> bounds =  dw->getLocalArea(nullptr, anchor);
         DBG("callout bounds: " << bounds.toString());
         latmatchCalloutBox = & SonoCallOutBox::launchAsynchronously (std::move(wrap), bounds , dw, false, [this](const Component * comp) {
-            if (comp == mMainLinkButton.get()) return false;
+            if (comp == mMainLinkButton.get() || comp == mLatencyMatchButton.get() || comp == mMeasureLatencyButton.get()) return false;
             return true;
         });
         if (auto * box = dynamic_cast<SonoCallOutBox*>(latmatchCalloutBox.get())) {
@@ -3077,6 +3280,7 @@ void SonobusAudioProcessorEditor::showLatencyMatchView(bool show)
     }
 }
 
+#if SONOBUS_FEATURE_VIDEO
 void SonobusAudioProcessorEditor::showVDONinjaView(bool show, bool fromVideoButton)
 {
     if (show && vdoninjaViewCalloutBox == nullptr) {
@@ -3129,6 +3333,7 @@ void SonobusAudioProcessorEditor::showVDONinjaView(bool show, bool fromVideoButt
         }
     }
 }
+#endif
 
 void SonobusAudioProcessorEditor::showSuggestGroupView(bool show)
 {
@@ -3188,8 +3393,344 @@ void SonobusAudioProcessorEditor::showSuggestGroupView(bool show)
 }
 
 
+void SonobusAudioProcessorEditor::setupAppShell()
+{
+    mConnectPage = std::make_unique<ConnectPage> (*mConnectView, processor);
+    mPeersPage = std::make_unique<PeersPage> (*mTopLevelContainer);
+    mMixerPage = std::make_unique<MixerPage> (*mInputChannelsContainer,
+                                              *mSendChannelsChoice,
+                                              *mAddChannelGroupButton,
+                                              mInMuteButton.get(),
+                                              mInSoloButton.get());
+    mRemoteControlPage = std::make_unique<RemoteControlPage> (processor);
+    mSoundboardPage = std::make_unique<SoundboardPage> (*mSoundboardView);
+    mSettingsPage = std::make_unique<SettingsPage>();
+    mSettingsPage->setInputMixer (mMixerPage.get());
+    mAppShell = std::make_unique<AppShell>();
+
+    if (mSoundboardEdgeResizer)
+        mSoundboardEdgeResizer->setVisible (false);
+
+    mConnectView->onRequestDismiss = [this]()
+    {
+        if (mAppShell)
+            mAppShell->setPage (AppPage::Peers);
+    };
+
+    mAppShell->setPages (mConnectPage.get(), mPeersPage.get(), mRemoteControlPage.get(),
+                         mSoundboardPage.get(), mSettingsPage.get());
+    mAppShell->onPageChanged = [this] (AppPage page) { handleShellPageChanged (page); };
+
+    applySlimChromeVisibility();
+    refreshShellHeader();
+}
+
+void SonobusAudioProcessorEditor::ensureOptionsView()
+{
+    if (mOptionsView)
+        return;
+
+    mOptionsView = std::make_unique<OptionsView> (processor, getAudioDeviceManager);
+    mOptionsView->getShouldOverrideSampleRateValue = getShouldOverrideSampleRateValue;
+    mOptionsView->getShouldCheckForNewVersionValue = getShouldCheckForNewVersionValue;
+    mOptionsView->getAllowBluetoothInputValue = getAllowBluetoothInputValue;
+    mOptionsView->updateSliderSnap = [this]() { updateSliderSnap(); };
+    mOptionsView->setupLocalisation = [this] (const String& lang) { return setupLocalisation (lang); };
+    mOptionsView->saveSettingsIfNeeded = [this]() { if (saveSettingsIfNeeded) saveSettingsIfNeeded(); };
+    mOptionsView->updateKeybindings = [this]() { updateUseKeybindings(); };
+    mOptionsView->addComponentListener (this);
+}
+
+void SonobusAudioProcessorEditor::handleShellPageChanged (AppPage page)
+{
+    if (page == AppPage::Network)
+    {
+        mConnectView->setVisible (true);
+        mConnectView->updateState();
+        mConnectView->grabInitialFocus();
+    }
+    else
+    {
+        mConnectView->giveAwayKeyboardFocus();
+        if (page == AppPage::GroupControl)
+        {
+            if (mRemoteControlPage)
+                mRemoteControlPage->refreshFromProcessor();
+        }
+        else if (page == AppPage::Settings)
+        {
+            ensureOptionsView();
+            mSettingsPage->setOptionsView (mOptionsView.get());
+            mSettingsPage->setInputMixer (mMixerPage.get());
+            mOptionsView->showOptionsTab();
+            mOptionsView->updateState();
+            mInputChannelsContainer->setVisible (true);
+            mSendChannelsChoice->setVisible (true);
+            mAddChannelGroupButton->setVisible (true);
+            if (mInMuteButton) mInMuteButton->setVisible (true);
+            if (mInSoloButton) mInSoloButton->setVisible (true);
+            mInputChannelsContainer->rebuildChannelViews();
+            if (mMixerPage)
+                mMixerPage->resized();
+        }
+        else if (page == AppPage::Soundboard)
+        {
+            mSoundboardView->setVisible (true);
+            mSoundboardView->resized();
+        }
+        else if (page == AppPage::Peers)
+        {
+            if (mTopLevelContainer)
+                mTopLevelContainer->setEnabled (true);
+            updateLayout();
+            resized();
+        }
+
+        grabKeyboardFocus();
+    }
+
+    refreshShellHeader();
+}
+
+void SonobusAudioProcessorEditor::refreshShellHeader()
+{
+    if (! mAppShell)
+        return;
+
+    const bool connected = processor.isConnectedToServer() && processor.getCurrentJoinedGroup().isNotEmpty();
+    String extra;
+    String status = connected ? TRANS("Connected") : TRANS("Disconnected");
+    if (connected)
+    {
+        extra = String (processor.getNumberRemotePeers() + 1) + " in group";
+        const auto elapsed = mConnectionTimeLabel->getText();
+        if (elapsed.isNotEmpty() && ! elapsed.startsWithIgnoreCase ("Last"))
+            status << "  ·  " << elapsed;
+    }
+
+    if (processor.isBeingRemoteMixControlled())
+        extra = TRANS("Mix controlled by") + " " + processor.getRemoteMixControllerName();
+
+    mAppShell->updateHeader (connected,
+                             connected ? processor.getCurrentJoinedGroup() : String(),
+                             connected ? currConnectionInfo.userName : processor.getCurrentUsername(),
+                             extra,
+                             status);
+
+    if (mPeersHeading)
+        mPeersHeading->setText (TRANS("Peers") + " (" + String (processor.getNumberRemotePeers()) + ")",
+                                dontSendNotification);
+}
+
+void SonobusAudioProcessorEditor::styleSlimButton (Button& button, bool primary)
+{
+    button.setColour (TextButton::buttonColourId, primary ? SlimUi::accentBlue() : SlimUi::cardRaised());
+    button.setColour (TextButton::textColourOffId, SlimUi::text());
+    button.setColour (TextButton::textColourOnId, SlimUi::text());
+    button.setColour (TextButton::buttonOnColourId, SlimUi::mute());
+}
+
+void SonobusAudioProcessorEditor::applySlimChromeVisibility()
+{
+    if (mAppShell == nullptr)
+        return;
+
+    hideComponent (mTitleLabel.get());
+    hideComponent (mTitleImage.get());
+    hideComponent (mSettingsButton.get());
+    hideComponent (mConnectButton.get());
+    hideComponent (mAltConnectButton.get());
+    hideComponent (mMainLinkButton.get());
+    hideComponent (mMainLinkArrow.get());
+    hideComponent (mMainGroupLabel.get());
+    hideComponent (mMainPeerLabel.get());
+    hideComponent (mMainUserLabel.get());
+    hideComponent (mMainGroupImage.get());
+    hideComponent (mMainPersonImage.get());
+    hideComponent (mPeerLayoutFullButton.get());
+    hideComponent (mPeerLayoutMinimalButton.get());
+    hideComponent (mDrySlider.get());
+    hideComponent (mDryLabel.get());
+    hideComponent (mInMixerButton.get());
+    hideComponent (mPatchbayButton.get());
+    hideComponent (mSoundboardButton.get());
+    hideComponent (mConnectionTimeLabel.get());
+    hideComponent (mMainStatusLabel.get());
+    hideComponent (mBufferMinButton.get());
+    hideComponent (mMainPushToTalkButton.get());
+    hideComponent (mSetupAudioButton.get());
+    hideComponent (mFileBrowseButton.get());
+#if SONOBUS_FEATURE_CHAT
+    hideComponent (mChatButton.get());
+#endif
+#if SONOBUS_FEATURE_FX
+    hideComponent (mEffectsButton.get());
+#endif
+#if SONOBUS_FEATURE_METRONOME
+    hideComponent (mMetEnableButton.get());
+    hideComponent (mMetConfigButton.get());
+    hideComponent (mMetButtonBg.get());
+#endif
+#if SONOBUS_FEATURE_VIDEO
+    hideComponent (mVideoButton.get());
+#endif
+#if SONOBUS_FEATURE_RECORD
+    hideComponent (mRecordingButton.get());
+    hideComponent (mFileRecordingLabel.get());
+    hideComponent (mPeerRecImage.get());
+#endif
+
+    if (mPeersHeading)            mPeersHeading->setVisible (true);
+    if (mMasterBar)               mMasterBar->setVisible (true);
+    if (mLatencyMatchButton)      mLatencyMatchButton->setVisible (true);
+    if (mMeasureLatencyButton)    mMeasureLatencyButton->setVisible (true);
+    if (mPlayFileButton)          mPlayFileButton->setVisible (true);
+    if (mMainMuteButton)          mMainMuteButton->setVisible (true);
+    if (mMainRecvMuteButton)      mMainRecvMuteButton->setVisible (true);
+    if (mOutGainSlider)           mOutGainSlider->setVisible (true);
+    if (mOutGainLabel)            mOutGainLabel->setVisible (true);
+    if (inputMeter)               inputMeter->setVisible (true);
+    if (outputMeter)              outputMeter->setVisible (true);
+    if (mMainViewport)            mMainViewport->setVisible (true);
+    if (mFileAreaBg)              mFileAreaBg->setVisible (false);
+
+    if (mTopLevelContainer)
+        mTopLevelContainer->setEnabled (true);
+
+    if (mPeerContainer)
+    {
+        mPeerContainer->updateLayout();
+        mPeerContainer->resized();
+    }
+
+    mMainMuteButton->setButtonStyle (DrawableButton::ImageAboveTextLabel);
+    mMainMuteButton->setButtonText (TRANS("Input MUTE"));
+    mMainMuteButton->setColour (DrawableButton::backgroundOnColourId, SlimUi::mute());
+    mMainMuteButton->setColour (DrawableButton::backgroundColourId, SlimUi::cardRaised());
+
+    mMainRecvMuteButton->setButtonStyle (DrawableButton::ImageAboveTextLabel);
+    mMainRecvMuteButton->setButtonText (TRANS("Output MUTE"));
+    mMainRecvMuteButton->setColour (DrawableButton::backgroundOnColourId, SlimUi::mute());
+    mMainRecvMuteButton->setColour (DrawableButton::backgroundColourId, SlimUi::cardRaised());
+
+    mOutGainLabel->setText (TRANS("Master Volume"), dontSendNotification);
+    mOutGainLabel->setFont (SlimUi::displayRegular (12.0f));
+    mOutGainLabel->setColour (Label::textColourId, SlimUi::textDim());
+
+    styleSlimButton (*mAddChannelGroupButton, true);
+    styleSlimButton (*mLatencyMatchButton, false);
+    styleSlimButton (*mMeasureLatencyButton, false);
+    styleSlimButton (*mPlayFileButton, true);
+
+    if (mInMuteButton)
+    {
+        mInMuteButton->setColour (TextButton::buttonColourId, SlimUi::cardRaised());
+        mInMuteButton->setColour (TextButton::buttonOnColourId, SlimUi::mute());
+        mInMuteButton->setColour (TextButton::textColourOffId, SlimUi::text());
+        mInMuteButton->setColour (TextButton::textColourOnId, SlimUi::text());
+    }
+    if (mInSoloButton)
+    {
+        mInSoloButton->setColour (TextButton::buttonColourId, SlimUi::cardRaised());
+        mInSoloButton->setColour (TextButton::buttonOnColourId, SlimUi::accentBlue());
+        mInSoloButton->setColour (TextButton::textColourOffId, SlimUi::text());
+        mInSoloButton->setColour (TextButton::textColourOnId, SlimUi::text());
+    }
+}
+
+void SonobusAudioProcessorEditor::layoutSlimPeersChrome()
+{
+    auto* parent = mTopLevelContainer->getParentComponent();
+    mTopLevelContainer->setBounds (parent != nullptr ? parent->getLocalBounds()
+                                                     : Rectangle<int> (0, 0, getWidth(), getHeight()));
+
+    auto bounds = mTopLevelContainer->getLocalBounds().reduced (16, 12);
+
+    auto heading = bounds.removeFromTop (32);
+    mPeersHeading->setBounds (heading);
+
+    bounds.removeFromTop (10);
+
+    auto master = bounds.removeFromBottom (88);
+    mMasterBar->setBounds (master);
+
+    if (mPlayButton && mPlayButton->isVisible() && ! mCurrentAudioFile.isEmpty())
+    {
+        bounds.removeFromBottom (8);
+        auto transport = bounds.removeFromBottom (40);
+        auto left = transport.removeFromLeft (jmin (160, transport.getWidth() / 3));
+        mPlayButton->setBounds (left.removeFromLeft (40).reduced (2));
+        mSkipBackButton->setBounds (left.removeFromLeft (40).reduced (2));
+        mLoopButton->setBounds (left.removeFromLeft (40).reduced (2));
+        if (mFileMenuButton)
+            mFileMenuButton->setBounds (left.removeFromLeft (40).reduced (2));
+        transport.removeFromLeft (8);
+        if (mDismissTransportButton)
+            mDismissTransportButton->setBounds (transport.removeFromRight (36).reduced (2));
+        if (mWaveformThumbnail)
+            mWaveformThumbnail->setBounds (transport);
+        if (mFileAreaBg)
+            mFileAreaBg->setBounds (Rectangle<int>());
+    }
+
+    bounds.removeFromBottom (12);
+    mMainViewport->setBounds (bounds);
+
+    if (mMainMessageLabel)
+    {
+        mMainMessageLabel->setInterceptsMouseClicks (false, false);
+        mMainMessageLabel->setBounds (bounds.reduced (12, 24));
+        mMainMessageLabel->toFront (false);
+    }
+
+    auto bar = master.reduced (12, 10);
+    const int muteW = 92;
+    const int meterW = 24;
+    const int actionW = 148;
+    const int playW = 168;
+
+    auto inputMute = bar.removeFromLeft (muteW);
+    bar.removeFromLeft (8);
+    auto inMeters = bar.removeFromLeft (meterW);
+    bar.removeFromLeft (12);
+
+    auto play = bar.removeFromRight (playW);
+    bar.removeFromRight (8);
+    auto actions = bar.removeFromRight (actionW);
+    bar.removeFromRight (10);
+    auto outMeters = bar.removeFromRight (meterW);
+    bar.removeFromRight (8);
+    auto outputMute = bar.removeFromRight (muteW);
+    bar.removeFromRight (12);
+
+    mMainMuteButton->setBounds (inputMute);
+    inputMeter->setBounds (inMeters);
+    mMainRecvMuteButton->setBounds (outputMute);
+    outputMeter->setBounds (outMeters);
+
+    auto vol = bar;
+    mOutGainLabel->setBounds (vol.removeFromTop (16));
+    mOutGainSlider->setBounds (vol.reduced (0, 4));
+    mOutGainSlider->setMouseDragSensitivity (jmax (128, mOutGainSlider->getWidth()));
+
+    mLatencyMatchButton->setBounds (actions.removeFromTop (actions.getHeight() / 2).reduced (0, 2));
+    mMeasureLatencyButton->setBounds (actions.reduced (0, 2));
+    mPlayFileButton->setBounds (play.reduced (0, 10));
+}
+
 void SonobusAudioProcessorEditor::showConnectPopup(bool flag)
 {
+    if (mAppShell)
+    {
+        mAppShell->setPage (flag ? AppPage::Network : AppPage::Peers);
+        if (flag)
+        {
+            mConnectView->updateState();
+            mConnectView->grabInitialFocus();
+        }
+        return;
+    }
+
     if (flag) {
         mConnectView->toFront(true);
 
@@ -3271,9 +3812,11 @@ void SonobusAudioProcessorEditor::mouseUp (const MouseEvent& event)
             processor.getValueTreeState().getParameter(SonobusAudioProcessor::paramMainRecvMute)->setValueNotifyingHost(0.0);
         }
     }
+#if SONOBUS_FEATURE_REVERB
     else if (event.eventComponent == mReverbTitleLabel.get()) {
         mReverbEnabledButton->setToggleState(!mReverbEnabledButton->getToggleState(), sendNotification);
     }
+#endif
 }
 
 void SonobusAudioProcessorEditor::componentVisibilityChanged (Component& component)
@@ -3282,6 +3825,7 @@ void SonobusAudioProcessorEditor::componentVisibilityChanged (Component& compone
     //    DebugLogC("setting vis changed: %d", component.isVisible());
     //}
 
+#if SONOBUS_FEATURE_CHAT
     if (&component == mChatView.get()) {
         if (!mChatView->isVisible() && mChatWasVisible) {
             if (!mChatOverlay && mChatShowDidResize) {
@@ -3300,7 +3844,16 @@ void SonobusAudioProcessorEditor::componentVisibilityChanged (Component& compone
 
         mAboutToShowChat = false;
     }
-    else if (&component == mSoundboardView.get()) {
+    else
+#endif
+    if (&component == mSoundboardView.get()) {
+        if (mAppShell != nullptr)
+        {
+            mSoundboardWasVisible = mSoundboardView->isShowing();
+            processor.setLastSoundboardShown (mAppShell->getPage() == AppPage::Soundboard);
+            return;
+        }
+
         if (!mSoundboardView->isVisible() && mSoundboardWasVisible) {
             if (mSoundboardShowDidResize) {
                 // reduce size
@@ -3316,10 +3869,13 @@ void SonobusAudioProcessorEditor::componentVisibilityChanged (Component& compone
         mAboutToShowSoundboard = false;
     }
     else if (&component == mConnectView.get()) {
-        mTopLevelContainer->setEnabled(!mConnectView->isVisible());
-        if (!mConnectView->isVisible()) {
-            // focus on main connect button
-            mConnectButton->grabKeyboardFocus();
+        if (mAppShell == nullptr)
+            mTopLevelContainer->setEnabled(!mConnectView->isVisible());
+        if (!mConnectView->isVisible() && mConnectButton) {
+            if (mAppShell)
+                grabKeyboardFocus();
+            else
+                mConnectButton->grabKeyboardFocus();
         }
     }
 
@@ -3327,6 +3883,7 @@ void SonobusAudioProcessorEditor::componentVisibilityChanged (Component& compone
 
 void SonobusAudioProcessorEditor::componentMovedOrResized (Component& component, bool wasmoved, bool wasresized)
 {
+#if SONOBUS_FEATURE_CHAT
     if (&component == mChatView.get()) {
         if (mChatView->isVisible()) {
             processor.setLastChatWidth(mChatView->getWidth());
@@ -3335,8 +3892,10 @@ void SonobusAudioProcessorEditor::componentMovedOrResized (Component& component,
             }
         }
     }
-    else if (&component == mSoundboardView.get()) {
-        if (mSoundboardView->isVisible()) {
+    else
+#endif
+    if (&component == mSoundboardView.get()) {
+        if (mAppShell == nullptr && mSoundboardView->isVisible()) {
             processor.setLastSoundboardWidth(mSoundboardView->getWidth());
             if (!mIgnoreResize) {
                 resized();
@@ -3435,6 +3994,17 @@ void SonobusAudioProcessorEditor::showSettings(bool flag)
 {
     DBG("Got settings click");
 
+    if (mAppShell)
+    {
+        if (flag)
+            mAppShell->setPage (AppPage::Settings);
+        else if (processor.isConnectedToServer() && processor.getCurrentJoinedGroup().isNotEmpty())
+            mAppShell->setPage (AppPage::Peers);
+        else
+            mAppShell->setPage (AppPage::Network);
+        return;
+    }
+
     if (flag && settingsCalloutBox == nullptr) {
         
         //Viewport * wrap = new Viewport();
@@ -3515,6 +4085,7 @@ void SonobusAudioProcessorEditor::showSettings(bool flag)
     }
 }
 
+#if SONOBUS_FEATURE_FX
 void SonobusAudioProcessorEditor::showMonitorDelayView(bool flag)
 {
     if (flag && monDelayCalloutBox == nullptr) {
@@ -3570,6 +4141,7 @@ void SonobusAudioProcessorEditor::showMonitorDelayView(bool flag)
         }
     }
 }
+#endif
 
 
 void SonobusAudioProcessorEditor::updateState(bool rebuildInputChannels)
@@ -3594,10 +4166,14 @@ void SonobusAudioProcessorEditor::updateState(bool rebuildInputChannels)
         mRecordingButton->setToggleState(processor.isRecordingToFile(), dontSendNotification);
     }
 
+#if SONOBUS_FEATURE_REVERB
     mReverbModelChoice->setSelectedId(processor.getMainReverbModel(), dontSendNotification);
+#endif
+#if SONOBUS_FEATURE_FX
     mEffectsButton->setToggleState(processor.getMainReverbEnabled(), dontSendNotification);
+#endif
 
-
+#if SONOBUS_FEATURE_REVERB
     if (mReverbEnabledButton->getToggleState()) {
         mReverbHeaderBg->setFill(Colour::fromFloatRGBA(0.2f, 0.5f, 0.7f, 0.5f));                
     } else {
@@ -3605,6 +4181,7 @@ void SonobusAudioProcessorEditor::updateState(bool rebuildInputChannels)
     }
 
     mReverbEnabledButton->setAlpha(mReverbEnabledButton->getToggleState() ? 1.0 : 0.5);
+#endif
 
     int sendchval = (int) processor.getSendChannels();
     mSendChannelsChoice->setSelectedId(sendchval, dontSendNotification);
@@ -3627,6 +4204,7 @@ void SonobusAudioProcessorEditor::updateState(bool rebuildInputChannels)
     }
     
 
+#if SONOBUS_FEATURE_REVERB
     if (processor.getMainReverbModel() == SonobusAudioProcessor::ReverbModelFreeverb) {
         mReverbPreDelaySlider->setVisible(false);
         mReverbPreDelayLabel->setVisible(false);
@@ -3634,6 +4212,7 @@ void SonobusAudioProcessorEditor::updateState(bool rebuildInputChannels)
         mReverbPreDelaySlider->setVisible(true);
         mReverbPreDelayLabel->setVisible(true);        
     }
+#endif
 
     mPeerLayoutMinimalButton->setToggleState(processor.getPeerDisplayMode() == SonobusAudioProcessor::PeerDisplayModeMinimal, dontSendNotification);
     mPeerLayoutFullButton->setToggleState(processor.getPeerDisplayMode() == SonobusAudioProcessor::PeerDisplayModeFull, dontSendNotification);
@@ -3669,6 +4248,7 @@ void SonobusAudioProcessorEditor::updateState(bool rebuildInputChannels)
             labstr << TRANS("Waiting for other users to join group") << " \"" << currGroup << "\"...";
             mMainMessageLabel->setText(labstr, dontSendNotification);
             mMainMessageLabel->setVisible(true);
+            mMainMessageLabel->setFont (SlimUi::displayRegular (16.0f));
         } else {
             mMainMessageLabel->setText("", dontSendNotification);
             mMainMessageLabel->setVisible(false);
@@ -3691,14 +4271,20 @@ void SonobusAudioProcessorEditor::updateState(bool rebuildInputChannels)
         mMainLinkButton->setVisible(false);
         mMainLinkArrow->setVisible(false);
 
+#if SONOBUS_FEATURE_RECORD
         mPeerRecImage->setVisible(false);
+#endif
 
         mMainMessageLabel->setVisible(true);
 
         if (processor.getNumberRemotePeers() == 0 /* || !currConnected */ ) {
             String message;
-            message += TRANS("Press Connect button to start.") + "\n\n" + TRANS("Please use headphones if you are using a microphone!");
+            if (mAppShell)
+                message += TRANS("Join a group from the Network page.") + "\n\n" + TRANS("Please use headphones if you are using a microphone!");
+            else
+                message += TRANS("Press Connect button to start.") + "\n\n" + TRANS("Please use headphones if you are using a microphone!");
             mMainMessageLabel->setText(message, dontSendNotification);
+            mMainMessageLabel->setFont (SlimUi::displayRegular (16.0f));
         } else {
             mMainMessageLabel->setText("", dontSendNotification);
         }
@@ -3732,6 +4318,8 @@ void SonobusAudioProcessorEditor::updateState(bool rebuildInputChannels)
     mIAAHostButton->setVisible(iaaConnected);
 #endif
     
+    refreshShellHeader();
+    applySlimChromeVisibility();
     commandManager.commandStatusChanged();
 
 }
@@ -3754,6 +4342,7 @@ void SonobusAudioProcessorEditor::parameterChanged (const String& pname, float n
         }
         triggerAsyncUpdate();
     }
+#if SONOBUS_FEATURE_METRONOME
     else if (pname == SonobusAudioProcessor::paramMetEnabled) {
         {
             const ScopedLock sl (clientStateLock);
@@ -3768,6 +4357,7 @@ void SonobusAudioProcessorEditor::parameterChanged (const String& pname, float n
         }
         triggerAsyncUpdate();
     }
+#endif
     else if (pname == SonobusAudioProcessor::paramSendFileAudio) {
         {
             const ScopedLock sl (clientStateLock);
@@ -3782,6 +4372,7 @@ void SonobusAudioProcessorEditor::parameterChanged (const String& pname, float n
         }
         triggerAsyncUpdate();
     }
+#if SONOBUS_FEATURE_REVERB
     else if (pname == SonobusAudioProcessor::paramMainReverbModel) {
         {
             const ScopedLock sl (clientStateLock);
@@ -3796,6 +4387,7 @@ void SonobusAudioProcessorEditor::parameterChanged (const String& pname, float n
         }
         triggerAsyncUpdate();
     }
+#endif
     else if (pname == SonobusAudioProcessor::paramSendChannels) {
         {
             const ScopedLock sl (clientStateLock);
@@ -3967,7 +4559,9 @@ void SonobusAudioProcessorEditor::handleAsyncUpdate()
 
                 showConnectPopup(false);
 
+#if SONOBUS_FEATURE_CHAT
                 mChatView->addNewChatMessage(SBChatEvent(SBChatEvent::SystemType, ev.group, "", "", "", statstr));
+#endif
 
                 if (JUCEApplicationBase::isStandaloneApp() && saveSettingsIfNeeded) {
                     DBG("Saving settings");
@@ -3979,9 +4573,14 @@ void SonobusAudioProcessorEditor::handleAsyncUpdate()
                 updateLayout();
                 resized();
 
-                mMainMessageLabel->setWantsKeyboardFocus(true);
-                if (mMainMessageLabel->isShowing()) {
-                    mMainMessageLabel->grabKeyboardFocus();
+                if (mAppShell)
+                    grabKeyboardFocus();
+                else
+                {
+                    mMainMessageLabel->setWantsKeyboardFocus(true);
+                    if (mMainMessageLabel->isShowing()) {
+                        mMainMessageLabel->grabKeyboardFocus();
+                    }
                 }
             } else {
 
@@ -3990,7 +4589,9 @@ void SonobusAudioProcessorEditor::handleAsyncUpdate()
 
                     mConnectView->groupJoinFailed();
                     
+#if SONOBUS_FEATURE_CHAT
                     mChatView->addNewChatMessage(SBChatEvent(SBChatEvent::SystemType, ev.group, "", "", "", statstr));
+#endif
                     
                     // disconnect
                     processor.disconnectFromServer();
@@ -4010,7 +4611,9 @@ void SonobusAudioProcessorEditor::handleAsyncUpdate()
 
             //AccessibilityHandler::postAnnouncement(statstr, AccessibilityHandler::AnnouncementPriority::high);
 
+#if SONOBUS_FEATURE_CHAT
             mChatView->addNewChatMessage(SBChatEvent(SBChatEvent::SystemType, ev.group, "", "", "", statstr));
+#endif
 
             mPeerContainer->resetPendingUsers();
             updateServerStatusLabel(statstr);
@@ -4032,7 +4635,9 @@ void SonobusAudioProcessorEditor::handleAsyncUpdate()
             if (!currConnectionInfo.groupIsPublic) {
                 String mesg;
                 mesg << ev.user << TRANS(" - joined group");
+#if SONOBUS_FEATURE_CHAT
                 mChatView->addNewChatMessage(SBChatEvent(SBChatEvent::SystemType, ev.group, ev.user, "", "", mesg));
+#endif
             }
 
             // delay update
@@ -4045,7 +4650,9 @@ void SonobusAudioProcessorEditor::handleAsyncUpdate()
             if (!currConnectionInfo.groupIsPublic) {
                 String mesg;
                 mesg << ev.user << TRANS(" - left group");
+#if SONOBUS_FEATURE_CHAT
                 mChatView->addNewChatMessage(SBChatEvent(SBChatEvent::SystemType, ev.group, ev.user, "", "", mesg));
+#endif
             }
 
             mPeerContainer->peerLeftGroup(ev.group, ev.user);
@@ -4073,10 +4680,12 @@ void SonobusAudioProcessorEditor::handleAsyncUpdate()
         }
     }
 
+#if SONOBUS_FEATURE_CHAT
     if (haveNewChatEvents.compareAndSetBool(false, true))
     {
         mChatView->refreshMessages();
     }
+#endif
 
     if (mReloadFile) {
         loadAudioFromURL(mCurrentAudioFile);
@@ -4130,7 +4739,9 @@ void SonobusAudioProcessorEditor::showGroupMenu(bool show)
 
     items.add(GenericItemChooserItem(TRANS("Group Latency Match..."), {}, nullptr, true));
 
+#if SONOBUS_FEATURE_VIDEO
     items.add(GenericItemChooserItem(TRANS("VDO.Ninja Video Link..."), {}, nullptr, true));
+#endif
 
     items.add(GenericItemChooserItem(TRANS("Suggest New Group..."), {}, nullptr, true));
 
@@ -4149,11 +4760,16 @@ void SonobusAudioProcessorEditor::showGroupMenu(bool show)
         } else if (index == 1) {
             // group latency
             safeThis->showLatencyMatchView(true);
-        } else if (index == 2) {
+        }
+#if SONOBUS_FEATURE_VIDEO
+        else if (index == 2) {
             // vdo ninja
             safeThis->showVDONinjaView(true, false);
         }
         else if (index == 3) {
+#else
+        else if (index == 2) {
+#endif
             // suggest new group
             safeThis->showSuggestGroupView(true);
         }
@@ -4341,6 +4957,7 @@ void SonobusAudioProcessorEditor::showSuggestedGroupPrompt(const String &name, c
 }
 
 
+#if SONOBUS_FEATURE_CHAT
 void SonobusAudioProcessorEditor::showChatPanel(bool show, bool allowresize)
 {
 
@@ -4378,9 +4995,22 @@ void SonobusAudioProcessorEditor::showChatPanel(bool show, bool allowresize)
     }
 #endif
 }
+#endif
 
 void SonobusAudioProcessorEditor::showSoundboardPanel(bool show, bool allowresize)
 {
+    if (mAppShell)
+    {
+        if (show)
+            mAppShell->setPage (AppPage::Soundboard);
+        else if (processor.isConnectedToServer() && processor.getCurrentJoinedGroup().isNotEmpty())
+            mAppShell->setPage (AppPage::Peers);
+        else
+            mAppShell->setPage (AppPage::Network);
+
+        processor.setLastSoundboardShown (show);
+        return;
+    }
 #if !(JUCE_IOS || JUCE_ANDROID)
     // attempt resize
     if (allowresize && show && !isNarrow) {
@@ -4415,6 +5045,35 @@ void SonobusAudioProcessorEditor::showSoundboardPanel(bool show, bool allowresiz
 void SonobusAudioProcessorEditor::parentHierarchyChanged()
 {    
     AudioProcessorEditor::parentHierarchyChanged();
+
+    if (mOptionsView && getAudioDeviceManager)
+        mOptionsView->getAudioDeviceManager = getAudioDeviceManager;
+
+    syncWindowKeyListener();
+}
+
+void SonobusAudioProcessorEditor::syncWindowKeyListener()
+{
+    auto* mappings = commandManager.getKeyMappings();
+    auto* top = getTopLevelComponent();
+
+    if (windowKeyListenerTarget != nullptr
+        && (windowKeyListenerTarget != top || processor.getDisableKeyboardShortcuts()))
+    {
+        windowKeyListenerTarget->removeKeyListener (mappings);
+        windowKeyListenerTarget->removeKeyListener (&windowKeyForwarder);
+        windowKeyListenerTarget = nullptr;
+    }
+
+    if (processor.getDisableKeyboardShortcuts() || top == nullptr || top == this)
+        return;
+
+    if (windowKeyListenerTarget != top)
+    {
+        top->addKeyListener (mappings);
+        top->addKeyListener (&windowKeyForwarder);
+        windowKeyListenerTarget = top;
+    }
 }
 
 //==============================================================================
@@ -4441,11 +5100,13 @@ void SonobusAudioProcessorEditor::resized()
 #endif
 
 
+#if SONOBUS_FEATURE_CHAT
     if (mChatView->isVisible()) {
         narrowthresh += mChatView->getWidth();
     }
+#endif
 
-    if (mSoundboardView->isVisible()) {
+    if (mAppShell == nullptr && mSoundboardView->isVisible()) {
        narrowthresh += mSoundboardView->getWidth();
     }
 
@@ -4478,12 +5139,23 @@ void SonobusAudioProcessorEditor::resized()
         mMenuBar->setBounds(menuBounds);
     }
 
+    if (mAppShell)
+    {
+        mAppShell->setBounds (mainBounds);
+        layoutSlimPeersChrome();
+    }
+    else
+    {
+
+#if SONOBUS_FEATURE_CHAT
     int chatwidth = processor.getLastChatWidth();
 
     mChatOverlay = mainBounds.getWidth() - chatwidth < 340;
+#endif
 
     mIgnoreResize = true; // important!
  
+#if SONOBUS_FEATURE_CHAT
     mChatView->setBounds(getLocalBounds().removeFromRight(chatwidth));
 
     if (mChatView->isVisible() || mAboutToShowChat) {
@@ -4492,6 +5164,7 @@ void SonobusAudioProcessorEditor::resized()
             mChatView->setBounds(mainBounds.removeFromRight(chatwidth));
         }
     }
+#endif
 
     int soundboardwidth = processor.getLastSoundboardWidth();
     mSoundboardView->setBounds(getLocalBounds().removeFromRight(soundboardwidth));
@@ -4509,30 +5182,45 @@ void SonobusAudioProcessorEditor::resized()
 
     mainBox.performLayout(mainBounds);
 
+    }
 
-    mChatEdgeResizer->setBounds(mChatView->getLocalBounds().withWidth(5));
+#if SONOBUS_FEATURE_CHAT
+    if (mChatEdgeResizer)
+        mChatEdgeResizer->setBounds(mChatView->getLocalBounds().withWidth(5));
+#endif
 
-    mSoundboardEdgeResizer->setBounds(mSoundboardView->getLocalBounds().withWidth(5));
+    if (mAppShell == nullptr && mSoundboardEdgeResizer)
+        mSoundboardEdgeResizer->setBounds(mSoundboardView->getLocalBounds().withWidth(5));
 
 
     int inchantargwidth = mMainViewport->getWidth() - 10;
-
-    if (mInputChannelsContainer->getEstimatedWidth() != inchantargwidth && mInputChannelsContainer->isVisible()) {
-        mInputChannelsContainer->setEstimatedWidth(inchantargwidth);
-        mInputChannelsContainer->updateLayout(false);
-    }
-
     Rectangle<int> peersminbounds = mPeerContainer->getMinimumContentBounds();
-    Rectangle<int> inmixminbounds = mInputChannelsContainer->getMinimumContentBounds();
-
     Rectangle<int> inmixactualbounds = Rectangle<int>(0,0,0,0);
 
-    if (mInputChannelsContainer->isVisible()) {
-        inmixactualbounds = Rectangle<int>(0, 0,
-                                           std::max(inmixminbounds.getWidth(), inchantargwidth),
-                                           inmixminbounds.getHeight() + 5);
+    if (mAppShell == nullptr)
+    {
+        if (mInputChannelsContainer->getEstimatedWidth() != inchantargwidth && mInputChannelsContainer->isVisible()) {
+            mInputChannelsContainer->setEstimatedWidth(inchantargwidth);
+            mInputChannelsContainer->updateLayout(false);
+        }
 
-        mInputChannelsContainer->setBounds(inmixactualbounds);
+        Rectangle<int> inmixminbounds = mInputChannelsContainer->getMinimumContentBounds();
+
+        if (mInputChannelsContainer->isVisible()) {
+            inmixactualbounds = Rectangle<int>(0, 0,
+                                               std::max(inmixminbounds.getWidth(), inchantargwidth),
+                                               inmixminbounds.getHeight() + 5);
+
+            mInputChannelsContainer->setBounds(inmixactualbounds);
+        }
+    }
+    else if (mMixerPage != nullptr && mAppShell->getPage() == AppPage::Settings)
+    {
+        mMixerPage->resized();
+    }
+    else if (mRemoteControlPage != nullptr && mAppShell->getPage() == AppPage::GroupControl)
+    {
+        mRemoteControlPage->resized();
     }
 
     int vgap = inmixactualbounds.getHeight() > 0 ?  6 : 0;
@@ -4549,6 +5237,8 @@ void SonobusAudioProcessorEditor::resized()
 
     mMainViewport->setViewPosition(viewpos);
 
+    if (mAppShell == nullptr)
+    {
 
 #if JUCE_IOS || JUCE_ANDROID
     mSetupAudioButton->setSize(150, 1);
@@ -4560,8 +5250,10 @@ void SonobusAudioProcessorEditor::resized()
     
     mMainMessageLabel->setBounds(mMainViewport->getX() + 10, mSetupAudioButton->getBottom() + 10, mMainViewport->getRight() - mMainViewport->getX() - 20, jmin(120, mMainViewport->getBottom() - (mSetupAudioButton->getBottom() + 10)));
     
+#if SONOBUS_FEATURE_METRONOME
     auto metbgbounds = Rectangle<int>(mMetEnableButton->getX(), mMetEnableButton->getY(), mMetConfigButton->getRight() - mMetEnableButton->getX(),  mMetEnableButton->getHeight()).expanded(2, 2);
     mMetButtonBg->setRectangle (metbgbounds.toFloat());
+#endif
 
 
     //auto grouptextbounds = Rectangle<int>(mMainPeerLabel->getX(), mMainGroupImage->getY(), mMainUserLabel->getRight() - mMainPeerLabel->getX(),  mMainGroupImage->getHeight()).expanded(2, 2);
@@ -4578,23 +5270,29 @@ void SonobusAudioProcessorEditor::resized()
 
     const auto precwidth = 20;
     auto peerrecbounds = Rectangle<int>(mMainLinkButton->getRight() - precwidth - 4, mMainLinkButton->getY() + mMainLinkButton->getHeight()/2 - precwidth/2, precwidth,  precwidth);
+#if SONOBUS_FEATURE_RECORD
     mPeerRecImage->setTransformToFit(peerrecbounds.toFloat(), RectanglePlacement::fillDestination);
+#endif
 
+    }
 
     mDragDropBg->setRectangle (getLocalBounds().toFloat());
 
-
+    if (mAppShell == nullptr)
+    {
     auto filebgbounds = Rectangle<int>(mPlayButton->getX(), mWaveformThumbnail->getY(), 
                                        mDismissTransportButton->getRight() - mPlayButton->getX(),  
                                        mDismissTransportButton->getBottom() - mWaveformThumbnail->getY()).expanded(4, 6);
     mFileAreaBg->setRectangle (filebgbounds.toFloat());
+    }
     
     // connect component stuff
-    if (mConnectView) {
+    if (mConnectView && mAppShell == nullptr) {
         mConnectView->setBounds(getLocalBounds());
     }
 
-    mConnectionTimeLabel->setBounds(mConnectButton->getBounds().removeFromBottom(16));
+    if (mAppShell == nullptr)
+        mConnectionTimeLabel->setBounds(mConnectButton->getBounds().removeFromBottom(16));
     
     if (mRecordingButton) {
         mFileRecordingLabel->setBounds(mRecordingButton->getBounds().removeFromBottom(14).translated(0, 1));
@@ -4604,17 +5302,21 @@ void SonobusAudioProcessorEditor::resized()
     mOutGainSlider->setMouseDragSensitivity(jmax(128, mOutGainSlider->getWidth()));
     //mInGainSlider->setMouseDragSensitivity(jmax(128, mInGainSlider->getWidth()));
 
-    mDryLabel->setBounds(mDrySlider->getBounds().removeFromTop(17).removeFromLeft(mDrySlider->getWidth() - mDrySlider->getTextBoxWidth() + 3).translated(4, -2));
-    //mInGainLabel->setBounds(mInGainSlider->getBounds().removeFromTop(14).removeFromLeft(mInGainSlider->getWidth() - mInGainSlider->getTextBoxWidth() + 3).translated(4, 0));
-    mOutGainLabel->setBounds(mOutGainSlider->getBounds().removeFromTop(17).removeFromLeft(mOutGainSlider->getWidth() - mOutGainSlider->getTextBoxWidth() + 3).translated(4, -2));
+    if (mAppShell == nullptr)
+    {
+        mDryLabel->setBounds(mDrySlider->getBounds().removeFromTop(17).removeFromLeft(mDrySlider->getWidth() - mDrySlider->getTextBoxWidth() + 3).translated(4, -2));
+        mOutGainLabel->setBounds(mOutGainSlider->getBounds().removeFromTop(17).removeFromLeft(mOutGainSlider->getWidth() - mOutGainSlider->getTextBoxWidth() + 3).translated(4, -2));
+    }
 
 
     
     Component* dw = this; 
     
+#if SONOBUS_FEATURE_FX
     if (auto * callout = dynamic_cast<CallOutBox*>(effectsCalloutBox.get())) {
         callout->updatePosition(dw->getLocalArea(nullptr, mEffectsButton->getScreenBounds()), dw->getLocalBounds());
     }
+#endif
 
 
     updateSliderSnap();
@@ -4624,6 +5326,12 @@ void SonobusAudioProcessorEditor::resized()
 
 void SonobusAudioProcessorEditor::updateLayout()
 {
+    if (mAppShell)
+    {
+        applySlimChromeVisibility();
+        return;
+    }
+
     int minKnobWidth = 50;
     int minSliderWidth = 50;
     int minPannerWidth = 40;
@@ -4708,8 +5416,10 @@ void SonobusAudioProcessorEditor::updateLayout()
     //inputButtonBox.items.add(FlexItem(mutew, minitemheight, *mMonDelayButton).withMargin(0).withFlex(0) ); //.withMaxWidth(maxPannerWidth));
     inputButtonBox.items.add(FlexItem(3, 4));
     inputButtonBox.items.add(FlexItem(toolwidth, minitemheight, *mSoundboardButton).withMargin(0).withFlex(0) ); //.withMaxWidth(maxPannerWidth));
+#if SONOBUS_FEATURE_CHAT
     inputButtonBox.items.add(FlexItem(7, 6).withMargin(0).withFlex(0));
     inputButtonBox.items.add(FlexItem(toolwidth, minitemheight, *mChatButton).withMargin(0).withFlex(0) ); //.withMaxWidth(maxPannerWidth));
+#endif
     inputButtonBox.items.add(FlexItem(7, 6).withMargin(0).withFlex(0));
 
     inputRightBox.items.clear();
@@ -4733,8 +5443,10 @@ void SonobusAudioProcessorEditor::updateLayout()
     outputMainBox.items.add(FlexItem(7, 6).withMargin(0).withFlex(0));
     outputMainBox.items.add(FlexItem(toolwidth, minitemheight, *mBufferMinButton).withMargin(0).withFlex(0));
     outputMainBox.items.add(FlexItem(4, 6).withMargin(0).withFlex(0));
+#if SONOBUS_FEATURE_FX
     outputMainBox.items.add(FlexItem(toolwidth, minitemheight, *mEffectsButton).withMargin(0).withFlex(0));
     outputMainBox.items.add(FlexItem(4, 6).withMargin(0).withFlex(0));
+#endif
     outputMainBox.items.add(FlexItem(minSliderWidth, minitemheight, outBox).withMargin(0).withFlex(1)); //.withMaxWidth(isNarrow ? 160 : 120));
     outputMainBox.items.add(FlexItem(4, 6).withMargin(0).withFlex(0));
     outputMainBox.items.add(FlexItem(outmeterwidth, minitemheight, mainMeterBox).withMargin(0).withFlex(0));
@@ -4784,6 +5496,7 @@ void SonobusAudioProcessorEditor::updateLayout()
     mainGroupLayoutBox.items.add(FlexItem(4, 4));
     mainGroupLayoutBox.items.add(FlexItem(24, minitemheight, *mMainPeerLabel).withMargin(0).withFlex(0));
     mainGroupLayoutBox.items.add(FlexItem(minButtonWidth, minitemheight - 5, mainGroupUserBox).withMargin(0).withFlex(1));
+#if SONOBUS_FEATURE_VIDEO
     if (processor.isConnectedToServer() && processor.getCurrentJoinedGroup().isNotEmpty() && !isReallyNarrow) {
         mainGroupLayoutBox.items.add(FlexItem(3, 4).withMargin(1).withFlex(0.0));
         mainGroupLayoutBox.items.add(FlexItem(toolwidth, minitemheight, *mVideoButton).withMargin(0).withFlex(0));
@@ -4792,6 +5505,7 @@ void SonobusAudioProcessorEditor::updateLayout()
     else {
         mVideoButton->setVisible(false);
     }
+#endif
 
 
 
@@ -4863,6 +5577,7 @@ void SonobusAudioProcessorEditor::updateLayout()
     toolbarTextBox.items.add(FlexItem(40, minitemheight/2, *mMainStatusLabel).withMargin(0).withFlex(1));
 
 
+#if SONOBUS_FEATURE_METRONOME
     metVolBox.items.clear();
     metVolBox.flexDirection = FlexBox::Direction::column;
     metVolBox.items.add(FlexItem(minKnobWidth, knoblabelheight, *mMetLevelSliderLabel).withMargin(0).withFlex(0));
@@ -4894,10 +5609,12 @@ void SonobusAudioProcessorEditor::updateLayout()
     metBox.items.add(FlexItem(minKnobWidth, minitemheight, metVolBox).withMargin(0).withFlex(1));
     metBox.items.add(FlexItem(3, 6).withMargin(0).withFlex(0));
     metBox.items.add(FlexItem(80, minitemheight, metSendBox).withMargin(2).withFlex(1));
+#endif
 
     
     // effects
 
+#if SONOBUS_FEATURE_REVERB
     reverbSizeBox.items.clear();
     reverbSizeBox.flexDirection = FlexBox::Direction::column;
     reverbSizeBox.items.add(FlexItem(minKnobWidth, knoblabelheight, *mReverbSizeLabel).withMargin(0).withFlex(0));
@@ -4944,11 +5661,16 @@ void SonobusAudioProcessorEditor::updateLayout()
     reverbBox.items.add(FlexItem(100, minitemheight, reverbCheckBox).withMargin(0).withFlex(0));
     reverbBox.items.add(FlexItem(6, 5).withMargin(0).withFlex(0));
     reverbBox.items.add(FlexItem(100, knoblabelheight + minitemheight, reverbKnobBox).withMargin(0).withFlex(1));
+#endif
 
     
+#if SONOBUS_FEATURE_FX
     effectsBox.items.clear();
     effectsBox.flexDirection = FlexBox::Direction::column;
+#if SONOBUS_FEATURE_REVERB
     effectsBox.items.add(FlexItem(minKnobWidth, knoblabelheight + minitemheight + 10, reverbBox).withMargin(0).withFlex(1));
+#endif
+#endif
     
     
     toolbarBox.items.clear();
@@ -4960,9 +5682,11 @@ void SonobusAudioProcessorEditor::updateLayout()
     toolbarBox.items.add(FlexItem(2, 6).withMargin(0).withFlex(0.1).withMaxWidth(8));
     toolbarBox.items.add(FlexItem(toolwidth, minitemheight, *mMainPushToTalkButton).withMargin(0).withFlex(0));
     toolbarBox.items.add(FlexItem(2, 6).withMargin(0).withFlex(0.1));
+#if SONOBUS_FEATURE_METRONOME
     toolbarBox.items.add(FlexItem(toolwidth, minitemheight, *mMetEnableButton).withMargin(0).withFlex(0).withMaxHeight(minitemheight+2).withAlignSelf(FlexItem::AlignSelf::center));
     toolbarBox.items.add(FlexItem(36, minitemheight, *mMetConfigButton).withMargin(0).withFlex(0).withMaxHeight(minitemheight+2).withAlignSelf(FlexItem::AlignSelf::center));
     toolbarBox.items.add(FlexItem(2, 5).withMargin(0).withFlex(0.1));
+#endif
 
    
 #if JUCE_IOS || JUCE_ANDROID
@@ -4973,8 +5697,7 @@ void SonobusAudioProcessorEditor::updateLayout()
     }
 #endif
 
-    if (mRecordingButton) {
-
+    if (mPlayButton) {
         transportVBox.items.clear();
         transportVBox.flexDirection = FlexBox::Direction::column;
 
@@ -5021,8 +5744,10 @@ void SonobusAudioProcessorEditor::updateLayout()
         transportBox.items.add(FlexItem(14, 6).withMargin(1).withFlex(0));        
 #endif
 
+#if SONOBUS_FEATURE_RECORD
         toolbarBox.items.add(FlexItem(toolwidth, minitemheight, *mRecordingButton).withMargin(0).withFlex(0));
         toolbarBox.items.add(FlexItem(2, 6).withMargin(0).withFlex(0.1).withMaxWidth(6));
+#endif
         toolbarBox.items.add(FlexItem(toolwidth, minitemheight, *mFileBrowseButton).withMargin(0).withFlex(0));
     }
 
@@ -5322,6 +6047,7 @@ bool SonobusAudioProcessorEditor::setupLocalisation(const String & overrideLang)
 
     bool retval = false;
 
+#if SONOBUS_FEATURE_I18N
     int retbytes = 0;
     int retfbytes = 0;
     String region = SystemStats::getUserRegion();
@@ -5375,16 +6101,22 @@ bool SonobusAudioProcessorEditor::setupLocalisation(const String & overrideLang)
         DBG("Couldn't find mapping for lang: " << lang << "  region: " << region << " displang: " <<  displang <<  "  - resname: " << resname);
         retval = false;
     }
+#endif
 
 #ifdef JUCE_ANDROID
    // Font::setFallbackFontName("Droid Sans Fallback");
 #endif
 
+#if SONOBUS_FEATURE_I18N
     if (retval) {
         mActiveLanguageCode = displang.toStdString();
     } else {
         mActiveLanguageCode = "en-us"; // indicates we are using english
     }
+#else
+    mActiveLanguageCode = "en-us";
+    retval = true;
+#endif
 
     DBG("Setup localization: active lang code: " << mActiveLanguageCode);
     
@@ -5518,6 +6250,7 @@ void SonobusAudioProcessorEditor::getCommandInfo (CommandID cmdID, ApplicationCo
                 info.addDefaultKeypress ('s', ModifierKeys::commandModifier);
             }
             break;
+#if SONOBUS_FEATURE_CHAT
         case SonobusCommands::ChatToggle:
             info.setInfo (TRANS("Show/Hide Chat"),
                           TRANS("Show or hide chat area"),
@@ -5527,6 +6260,7 @@ void SonobusAudioProcessorEditor::getCommandInfo (CommandID cmdID, ApplicationCo
                 info.addDefaultKeypress ('y', ModifierKeys::commandModifier);
             }
             break;
+#endif
         case SonobusCommands::SoundboardToggle:
             info.setInfo (TRANS("Show/Hide Soundboard"),
                           TRANS("Show or hide soundboard panel"),
@@ -5545,6 +6279,7 @@ void SonobusAudioProcessorEditor::getCommandInfo (CommandID cmdID, ApplicationCo
                 info.addDefaultKeypress ('k', ModifierKeys::commandModifier);
             }
             break;
+#if SONOBUS_FEATURE_FX
         case SonobusCommands::ToggleAllMonitorDelay:
             info.setInfo (TRANS("Enable/Disable Monitor Delay"),
                           TRANS("Enable/Disable Monitor Delay"),
@@ -5554,6 +6289,7 @@ void SonobusAudioProcessorEditor::getCommandInfo (CommandID cmdID, ApplicationCo
                 info.addDefaultKeypress ('b', ModifierKeys::commandModifier);
             }
             break;
+#endif
         case SonobusCommands::Connect:
             info.setInfo (TRANS("Connect"),
                           TRANS("Connect"),
@@ -5581,6 +6317,7 @@ void SonobusAudioProcessorEditor::getCommandInfo (CommandID cmdID, ApplicationCo
                 info.addDefaultKeypress (',', ModifierKeys::commandModifier);
             }
             break;
+#if SONOBUS_FEATURE_RECORD
         case SonobusCommands::RecordToggle:
             info.setInfo (TRANS("Record"),
                           TRANS("Toggle Record"),
@@ -5590,12 +6327,15 @@ void SonobusAudioProcessorEditor::getCommandInfo (CommandID cmdID, ApplicationCo
                 info.addDefaultKeypress ('r', ModifierKeys::commandModifier);
             }
             break;
+#endif
+#if SONOBUS_FEATURE_UPDATER
         case SonobusCommands::CheckForNewVersion:
             info.setInfo (TRANS("Check For New Version"),
                           TRANS("Check for New Version"),
                           TRANS("Popup"), 0);
             info.setActive(true);
             break;
+#endif
         case SonobusCommands::ToggleFullInfoView:
             info.setInfo(TRANS("Toggle Full Info View"),
                 TRANS("Toggle Full Info View"),
@@ -5673,6 +6413,7 @@ void SonobusAudioProcessorEditor::getCommandInfo (CommandID cmdID, ApplicationCo
                 info.addDefaultKeypress ('l', ModifierKeys::commandModifier | ModifierKeys::altModifier);
             }
             break;
+#if SONOBUS_FEATURE_VIDEO
         case SonobusCommands::VDONinjaVideoLink:
             info.setInfo (TRANS("VDO.Ninja Video Link..."),
                           TRANS("VDO.Ninja Video Link..."),
@@ -5682,6 +6423,7 @@ void SonobusAudioProcessorEditor::getCommandInfo (CommandID cmdID, ApplicationCo
                 info.addDefaultKeypress ('v', ModifierKeys::commandModifier | ModifierKeys::altModifier);
             }
             break;
+#endif
         case SonobusCommands::SuggestNewGroup:
             info.setInfo (TRANS("Suggest New Group..."),
                           TRANS("Suggest New Group..."),
@@ -5717,11 +6459,17 @@ void SonobusAudioProcessorEditor::getAllCommands (Array<CommandID>& cmds) {
     cmds.add(SonobusCommands::Disconnect);
     cmds.add(SonobusCommands::ShowOptions);
     cmds.add(SonobusCommands::OpenFile);
+#if SONOBUS_FEATURE_RECORD
     cmds.add(SonobusCommands::RecordToggle);
+#endif
+#if SONOBUS_FEATURE_UPDATER
     cmds.add(SonobusCommands::CheckForNewVersion);
+#endif
     cmds.add(SonobusCommands::LoadSetupFile);
     cmds.add(SonobusCommands::SaveSetupFile);
+#if SONOBUS_FEATURE_CHAT
     cmds.add(SonobusCommands::ChatToggle);
+#endif
     cmds.add(SonobusCommands::SoundboardToggle);
     cmds.add(SonobusCommands::SkipBack);
     cmds.add(SonobusCommands::ShowFileMenu);
@@ -5731,10 +6479,14 @@ void SonobusAudioProcessorEditor::getAllCommands (Array<CommandID>& cmds) {
     cmds.add(SonobusCommands::ShowConnectMenu);
     cmds.add(SonobusCommands::ToggleFullInfoView);
     cmds.add(SonobusCommands::StopAllSoundboardPlayback);
+#if SONOBUS_FEATURE_FX
     cmds.add(SonobusCommands::ToggleAllMonitorDelay);
+#endif
     cmds.add(SonobusCommands::CopyGroupLink);
     cmds.add(SonobusCommands::GroupLatencyMatch);
+#if SONOBUS_FEATURE_VIDEO
     cmds.add(SonobusCommands::VDONinjaVideoLink);
+#endif
     cmds.add(SonobusCommands::SuggestNewGroup);
     cmds.add(SonobusCommands::ResetAllJitterBuffers);
 
@@ -5763,11 +6515,13 @@ bool SonobusAudioProcessorEditor::perform (const InvocationInfo& info) {
                 mSoundboardView->stopAllSamples();
             }
             break;
+#if SONOBUS_FEATURE_FX
         case SonobusCommands::ToggleAllMonitorDelay:
             if (getInputChannelGroupsView()) {
                 getInputChannelGroupsView()->toggleAllMonitorDelay();
             }
             break;
+#endif
         case SonobusCommands::ToggleFullInfoView:
 
             buttonClicked(processor.getPeerDisplayMode() == SonobusAudioProcessor::PeerDisplayModeMinimal ?
@@ -5844,12 +6598,17 @@ bool SonobusAudioProcessorEditor::perform (const InvocationInfo& info) {
             showLoadSettingsPreset();
 
             break;
+#if SONOBUS_FEATURE_CHAT
         case SonobusCommands::ChatToggle:
             showChatPanel(!mChatView->isVisible());
             resized();
             break;
+#endif
         case SonobusCommands::SoundboardToggle:
-            showSoundboardPanel(!mSoundboardView->isVisible());
+            if (mAppShell)
+                showSoundboardPanel (mAppShell->getPage() != AppPage::Soundboard);
+            else
+                showSoundboardPanel (! mSoundboardView->isVisible());
             resized();
             break;
         case SonobusCommands::SaveSetupFile:
@@ -5876,14 +6635,18 @@ bool SonobusAudioProcessorEditor::perform (const InvocationInfo& info) {
             buttonClicked(mSettingsButton.get());
 
             break;
+#if SONOBUS_FEATURE_RECORD
         case SonobusCommands::RecordToggle:
             DBG("got record toggle!");
             buttonClicked(mRecordingButton.get());
 
             break;
+#endif
+#if SONOBUS_FEATURE_UPDATER
         case SonobusCommands::CheckForNewVersion:   
             LatestVersionCheckerAndUpdater::getInstance()->checkForNewVersion (true); 
             break;
+#endif
 
         case SonobusCommands::CopyGroupLink:
             copyGroupLink();
@@ -5891,9 +6654,11 @@ bool SonobusAudioProcessorEditor::perform (const InvocationInfo& info) {
         case SonobusCommands::GroupLatencyMatch:
             showLatencyMatchView(true);
             break;
+#if SONOBUS_FEATURE_VIDEO
         case SonobusCommands::VDONinjaVideoLink:
             showVDONinjaView(true, mVideoButton->isShowing());
             break;
+#endif
         case SonobusCommands::SuggestNewGroup:
             showSuggestGroupView(true);
             break;
@@ -5979,7 +6744,9 @@ PopupMenu SonobusAudioProcessorEditor::SonobusMenuBarModel::getMenuForIndex (int
             retval.addCommandItem (&parent.commandManager, SonobusCommands::SaveSetupFile);
 
             retval.addSeparator();
+#if SONOBUS_FEATURE_UPDATER
             retval.addCommandItem (&parent.commandManager, SonobusCommands::CheckForNewVersion);
+#endif
 
 #if (JUCE_WINDOWS || JUCE_LINUX)
             retval.addCommandItem (&parent.commandManager, SonobusCommands::ShowOptions);
@@ -5994,13 +6761,17 @@ PopupMenu SonobusAudioProcessorEditor::SonobusMenuBarModel::getMenuForIndex (int
             retval.addCommandItem (&parent.commandManager, SonobusCommands::MuteAllInput);
             retval.addCommandItem (&parent.commandManager, SonobusCommands::MuteAllPeers);
             retval.addSeparator();
+#if SONOBUS_FEATURE_FX
             retval.addCommandItem (&parent.commandManager, SonobusCommands::ToggleAllMonitorDelay);
+#endif
             retval.addCommandItem (&parent.commandManager, SonobusCommands::ResetAllJitterBuffers);
             break;
         case MenuGroupIndex:
             retval.addCommandItem (&parent.commandManager, SonobusCommands::CopyGroupLink);
             retval.addCommandItem (&parent.commandManager, SonobusCommands::GroupLatencyMatch);
+#if SONOBUS_FEATURE_VIDEO
             retval.addCommandItem (&parent.commandManager, SonobusCommands::VDONinjaVideoLink);
+#endif
             retval.addCommandItem (&parent.commandManager, SonobusCommands::SuggestNewGroup);
             break;
         case MenuTransportIndex:
@@ -6008,12 +6779,16 @@ PopupMenu SonobusAudioProcessorEditor::SonobusMenuBarModel::getMenuForIndex (int
             retval.addCommandItem (&parent.commandManager, SonobusCommands::SkipBack);
             retval.addCommandItem (&parent.commandManager, SonobusCommands::ToggleLoop);
             retval.addSeparator();
+#if SONOBUS_FEATURE_RECORD
             retval.addCommandItem (&parent.commandManager, SonobusCommands::RecordToggle);
             retval.addSeparator();
+#endif
             retval.addCommandItem (&parent.commandManager, SonobusCommands::StopAllSoundboardPlayback);
             break;
         case MenuViewIndex:
+#if SONOBUS_FEATURE_CHAT
             retval.addCommandItem (&parent.commandManager, SonobusCommands::ChatToggle);
+#endif
             retval.addCommandItem (&parent.commandManager, SonobusCommands::SoundboardToggle);
             retval.addCommandItem (&parent.commandManager, SonobusCommands::ToggleFullInfoView);
             break;

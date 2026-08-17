@@ -520,6 +520,10 @@ static Image createNSWindowSnapshot (NSWindow* nsWindow)
 {
     JUCE_AUTORELEASEPOOL
     {
+       #if defined (MAC_OS_VERSION_15_0) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_15_0
+        ignoreUnused (nsWindow);
+        return {};
+       #else
         // CGWindowListCreateImage is replaced by functions in the ScreenCaptureKit framework, but
         // that framework is only available from macOS 12.3 onwards.
         // A suitable @available check should be added once the minimum build OS is 12.3 or greater,
@@ -551,6 +555,7 @@ static Image createNSWindowSnapshot (NSWindow* nsWindow)
         CGImageRelease (screenShot);
 
         return result;
+       #endif
     }
 }
 

@@ -2,8 +2,11 @@
 // Copyright (C) 2021 Jesse Chappell
 
 #include "ConnectView.h"
+#include "SlimUi.h"
 
+#if SONOBUS_FEATURE_RANDOM_GROUP
 #include "RandomSentenceGenerator.h"
+#endif
 
 using namespace SonoAudio;
 
@@ -31,6 +34,12 @@ enum {
     separatorColourId = 0x1002850,
 };
 
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
+static constexpr int kConnectTabsWithRecents = 4;
+#else
+static constexpr int kConnectTabsWithRecents = 3;
+#endif
+
 
 ConnectView::ConnectView(SonobusAudioProcessor& proc, AooServerConnectionInfo & info)
 : Component(), processor(proc), currConnectionInfo(info),
@@ -39,21 +48,25 @@ recentsGroupFont (17.0 * SonoLookAndFeel::getFontScale(), Font::bold), recentsNa
 publicGroupsListModel(this)
 {
     setColour (nameTextColourId, Colour::fromFloatRGBA(1.0f, 1.0f, 1.0f, 0.9f));
-    setColour (selectedColourId, Colour::fromFloatRGBA(0.0f, 0.4f, 0.8f, 0.5f));
+    setColour (selectedColourId, SlimUi::accentPurple().withAlpha (0.85f));
     setColour (separatorColourId, Colour::fromFloatRGBA(0.3f, 0.3f, 0.3f, 0.3f));
 
     mConnectTab = std::make_unique<SonobusConnectTabbedComponent>(TabbedButtonBar::Orientation::TabsAtTop, *this);
     mConnectTab->setOutline(0);
     mConnectTab->setTabBarDepth(36);
     mConnectTab->getTabbedButtonBar().setMinimumTabScaleFactor(0.1f);
-    mConnectTab->getTabbedButtonBar().setColour(TabbedButtonBar::frontTextColourId, Colour::fromFloatRGBA(0.4, 0.8, 1.0, 1.0));
-    mConnectTab->getTabbedButtonBar().setColour(TabbedButtonBar::frontOutlineColourId, Colour::fromFloatRGBA(0.4, 0.8, 1.0, 0.5));
+    mConnectTab->getTabbedButtonBar().setColour(TabbedButtonBar::frontTextColourId, SlimUi::accentLavender());
+    mConnectTab->getTabbedButtonBar().setColour(TabbedButtonBar::frontOutlineColourId, SlimUi::accentPurple());
 
     mDirectConnectContainer = std::make_unique<Component>();
+    mDirectConnectViewport = std::make_unique<Viewport>();
+    mDirectConnectViewport->setViewedComponent(mDirectConnectContainer.get(), false);
     mServerConnectContainer = std::make_unique<Component>();
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     mPublicServerConnectContainer = std::make_unique<Component>();
-    mServerConnectViewport = std::make_unique<Viewport>();
     mPublicServerConnectViewport = std::make_unique<Viewport>();
+#endif
+    mServerConnectViewport = std::make_unique<Viewport>();
     mRecentsContainer = std::make_unique<Component>();
 
     mServerConnectViewport->setViewedComponent(mServerConnectContainer.get());
@@ -65,10 +78,12 @@ publicGroupsListModel(this)
     mRecentsGroup->setColour(GroupComponent::outlineColourId, Colour::fromFloatRGBA(0.8, 0.8, 0.8, 0.1));
     mRecentsGroup->setTextLabelPosition(Justification::centred);
 
-    mConnectTab->addTab(TRANS("RECENTS"), Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0), mRecentsContainer.get(), false);
-    mConnectTab->addTab(TRANS("PRIVATE GROUP"), Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0), mServerConnectViewport.get(), false);
-    mConnectTab->addTab(TRANS("PUBLIC GROUPS"), Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0), mPublicServerConnectContainer.get(), false);
-    //mConnectTab->addTab(TRANS("DIRECT"), Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0), mDirectConnectContainer.get(), false);
+    mConnectTab->addTab(TRANS("RECENTS"), SlimUi::card(), mRecentsContainer.get(), false);
+    mConnectTab->addTab(TRANS("PRIVATE GROUP"), SlimUi::card(), mServerConnectViewport.get(), false);
+    mConnectTab->addTab(TRANS("DIRECT IP"), SlimUi::card(), mDirectConnectViewport.get(), false);
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
+    mConnectTab->addTab(TRANS("PUBLIC GROUPS"), SlimUi::card(), mPublicServerConnectContainer.get(), false);
+#endif
 
 
 
@@ -86,7 +101,7 @@ publicGroupsListModel(this)
     mRemoteAddressStaticLabel = std::make_unique<Label>("remaddrst", TRANS("Host: "));
     mRemoteAddressStaticLabel->setJustificationType(Justification::centredRight);
 
-    mDirectConnectDescriptionLabel = std::make_unique<Label>("dirconndesc", TRANS("Connect directly to other instances of SonoBus on your local network with the local address that they advertise. This is experimental, using a private group is recommended instead, and works fine on local networks."));
+    mDirectConnectDescriptionLabel = std::make_unique<Label>("dirconndesc", TRANS("Connect directly to other instances of Netlay on your local network with the local address that they advertise. This is experimental, using a private group is recommended instead, and works fine on local networks."));
     mDirectConnectDescriptionLabel->setJustificationType(Justification::topLeft);
 
     mAddRemoteHostEditor = std::make_unique<TextEditor>("remaddredit");
@@ -102,7 +117,7 @@ publicGroupsListModel(this)
     mConnectTitle->setColour(Label::textColourId, Colour(0x66ffffff));
 
     mConnectComponentBg = std::make_unique<DrawableRectangle>();
-    mConnectComponentBg->setFill (Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0));
+    mConnectComponentBg->setFill (SlimUi::card());
 
     mConnectCloseButton = std::make_unique<SonoDrawableButton>("x", DrawableButton::ButtonStyle::ImageFitted);
     std::unique_ptr<Drawable> ximg(Drawable::createFromImageData(BinaryData::x_icon_svg, BinaryData::x_icon_svgSize));
@@ -122,14 +137,15 @@ publicGroupsListModel(this)
     mDirectConnectButton = std::make_unique<TextButton>("directconnect");
     mDirectConnectButton->setButtonText(TRANS("Direct Connect"));
     mDirectConnectButton->addListener(this);
-    mDirectConnectButton->setColour(TextButton::buttonColourId, Colour::fromFloatRGBA(0.1, 0.4, 0.6, 0.6));
+    mDirectConnectButton->setColour(TextButton::buttonColourId, SlimUi::accentBlue());
     mDirectConnectButton->setWantsKeyboardFocus(true);
 
 
     mServerConnectButton = std::make_unique<TextButton>("serverconnect");
     mServerConnectButton->setButtonText(TRANS("Connect to Group"));
     mServerConnectButton->addListener(this);
-    mServerConnectButton->setColour(TextButton::buttonColourId, Colour::fromFloatRGBA(0.1, 0.4, 0.6, 0.6));
+    mServerConnectButton->setColour(TextButton::buttonColourId, SlimUi::accentBlue());
+    mServerConnectButton->setColour(TextButton::textColourOffId, SlimUi::text());
     mServerConnectButton->setWantsKeyboardFocus(true);
 
     mServerHostEditor = std::make_unique<TextEditor>("srvaddredit");
@@ -190,12 +206,14 @@ publicGroupsListModel(this)
     mServerGroupPasswordShowButton->setColour(SonoDrawableButton::backgroundOnColourId, Colours::transparentBlack);
 
     
+#if SONOBUS_FEATURE_RANDOM_GROUP
     mServerGroupRandomButton = std::make_unique<SonoDrawableButton>("randgroup", DrawableButton::ButtonStyle::ImageFitted);
     std::unique_ptr<Drawable> randimg(Drawable::createFromImageData(BinaryData::dice_icon_128_png, BinaryData::dice_icon_128_pngSize));
     mServerGroupRandomButton->setTitle(TRANS("Randomize Group Name"));
     mServerGroupRandomButton->setImages(randimg.get());
     mServerGroupRandomButton->addListener(this);
     mServerGroupRandomButton->setTooltip(TRANS("Generate a random group name"));
+#endif
 
     mServerCopyButton = std::make_unique<SonoDrawableButton>("copy", DrawableButton::ButtonStyle::ImageFitted);
     std::unique_ptr<Drawable> copyimg(Drawable::createFromImageData(BinaryData::copy_icon_svg, BinaryData::copy_icon_svgSize));
@@ -264,6 +282,7 @@ publicGroupsListModel(this)
     mRecentsListBox->setRowClickedOnMouseDown(false);
 
 
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     mPublicGroupsListBox = std::make_unique<ListBox>("publicgroupslist");
     mPublicGroupsListBox->setColour (ListBox::outlineColourId, Colour::fromFloatRGBA(0.7, 0.7, 0.7, 0.0));
     mPublicGroupsListBox->setColour (ListBox::backgroundColourId, Colour::fromFloatRGBA(0.1, 0.12, 0.1, 0.0f));
@@ -327,6 +346,7 @@ publicGroupsListModel(this)
     configEditor(mPublicServerGroupEditor.get());
     mPublicServerGroupEditor->setTextToShowWhenEmpty(TRANS("enter group name"), Colour(0x44ffffff));
     mPublicServerGroupEditor->setTooltip(TRANS("Choose a descriptive group name that includes geographic information and genre"));
+#endif
 
 
     // parenting
@@ -342,7 +362,9 @@ publicGroupsListModel(this)
     mServerConnectContainer->addAndMakeVisible(mServerUsernameEditor.get());
     mServerConnectContainer->addAndMakeVisible(mServerUserStaticLabel.get());
     mServerConnectContainer->addAndMakeVisible(mServerGroupEditor.get());
+#if SONOBUS_FEATURE_RANDOM_GROUP
     mServerConnectContainer->addAndMakeVisible(mServerGroupRandomButton.get());
+#endif
     mServerConnectContainer->addAndMakeVisible(mServerGroupPasswordShowButton.get());
 #if ! (JUCE_IOS || JUCE_ANDROID)
     mServerConnectContainer->addAndMakeVisible(mServerPasteButton.get());
@@ -361,6 +383,7 @@ publicGroupsListModel(this)
     mRecentsContainer->addAndMakeVisible(mRecentsListBox.get());
     mRecentsContainer->addAndMakeVisible(mClearRecentsButton.get());
 
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     mPublicServerConnectContainer->addAndMakeVisible(mPublicGroupComponent.get());
     mPublicGroupComponent->addAndMakeVisible(mPublicGroupsListBox.get());
 
@@ -372,6 +395,7 @@ publicGroupsListModel(this)
     mPublicServerConnectContainer->addAndMakeVisible(mPublicServerInfoStaticLabel.get());
     mPublicServerConnectContainer->addAndMakeVisible(mPublicServerStatusInfoLabel.get());
     mPublicServerConnectContainer->addAndMakeVisible(mPublicServerGroupEditor.get());
+#endif
 
 
     addAndMakeVisible(mConnectComponentBg.get());
@@ -381,9 +405,11 @@ publicGroupsListModel(this)
     addAndMakeVisible(mConnectMenuButton.get());
 
 
+#if SONOBUS_FEATURE_RANDOM_GROUP
     std::istringstream gramstream(std::string(BinaryData::wordmaker_g, BinaryData::wordmaker_gSize));
     mRandomSentence = std::make_unique<RandomSentenceGenerator>(gramstream);
     mRandomSentence->capEveryWord = true;
+#endif
 
     setFocusContainerType(FocusContainerType::keyboardFocusContainer);
     mConnectTab->setFocusContainerType(FocusContainerType::none);
@@ -425,13 +451,18 @@ void ConnectView::escapePressed()
         && !mServerUsernameEditor->hasKeyboardFocus(false)
         && !mServerUserPasswordEditor->hasKeyboardFocus(false)
         && !mServerGroupPasswordEditor->hasKeyboardFocus(false)
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         && !mPublicServerHostEditor->hasKeyboardFocus(false)
         && !mPublicServerGroupEditor->hasKeyboardFocus(false)
         && !mPublicServerUsernameEditor->hasKeyboardFocus(false)
+#endif
         )
     {
         // close us down
-        setVisible(false);
+        if (onRequestDismiss)
+            onRequestDismiss();
+        else
+            setVisible(false);
     }
 }
 
@@ -471,7 +502,7 @@ void ConnectView::updateState()
     updateRecents();
 
     if (firstTimeConnectShow) {
-        if (mConnectTab->getNumTabs() > 2) {
+        if (mConnectTab->getNumTabs() >= kConnectTabsWithRecents) {
             if (recentsListModel.getNumRows() > 0) {
                 // show recents tab first
                 mConnectTab->setCurrentTabIndex(0);
@@ -482,9 +513,11 @@ void ConnectView::updateState()
         firstTimeConnectShow = false;
     }
 
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     if (mConnectTab->getCurrentContentComponent() == mPublicServerConnectContainer.get()) {
         publicGroupLogin();
     }
+#endif
 }
 
 
@@ -556,7 +589,9 @@ void ConnectView::updateLayout()
     servGroupBox.flexDirection = FlexBox::Direction::row;
     servGroupBox.items.add(FlexItem(servLabelWidth, minitemheight, *mServerGroupStaticLabel).withMargin(2).withFlex(0.25));
     servGroupBox.items.add(FlexItem(120, minitemheight, *mServerGroupEditor).withMargin(2).withFlex(1));
+#if SONOBUS_FEATURE_RANDOM_GROUP
     servGroupBox.items.add(FlexItem(minPannerWidth, minitemheight, *mServerGroupRandomButton).withMargin(2).withFlex(0));
+#endif
 
     servGroupPassBox.items.clear();
     servGroupPassBox.flexDirection = FlexBox::Direction::row;
@@ -604,6 +639,7 @@ void ConnectView::updateLayout()
 
     minHeight = 4*minitemheight + 3*minpassheight + 58;
 
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     // public groups stuff
 
     int staticlabelmaxw = 180;
@@ -639,6 +675,7 @@ void ConnectView::updateLayout()
     publicGroupsBox.items.add(FlexItem(180, minitemheight, publicAddGroupBox).withMargin(2).withFlex(0).withMaxWidth(maxpubservboxwidth));
     publicGroupsBox.items.add(FlexItem(5, 7).withFlex(0));
     publicGroupsBox.items.add(FlexItem(100, minitemheight, *mPublicGroupComponent).withMargin(2).withFlex(1));
+#endif
 
     // recents
     clearRecentsBox.items.clear();
@@ -663,13 +700,14 @@ void ConnectView::updateLayout()
     connectHorizBox.items.clear();
     connectHorizBox.flexDirection = FlexBox::Direction::row;
     connectHorizBox.items.add(FlexItem(100, 100, *mConnectTab).withMargin(3).withFlex(1));
-    if (mConnectTab->getNumTabs() < 3) {
+    if (mConnectTab->getNumTabs() < kConnectTabsWithRecents) {
         connectHorizBox.items.add(FlexItem(335, 100, *mRecentsGroup).withMargin(3).withFlex(0));
     }
 
     mainBox.items.clear();
     mainBox.flexDirection = FlexBox::Direction::column;
-    mainBox.items.add(FlexItem(100, minitemheight, connectTitleBox).withMargin(3).withFlex(0));
+    if (! mEmbeddedInShell)
+        mainBox.items.add(FlexItem(100, minitemheight, connectTitleBox).withMargin(3).withFlex(0));
     mainBox.items.add(FlexItem(100, 100, connectHorizBox).withMargin(3).withFlex(1));
 
 
@@ -682,7 +720,7 @@ void ConnectView::resized()  {
     mConnectComponentBg->setRectangle (getLocalBounds().toFloat());
 
     if (getWidth() > 700) {
-        if (mConnectTab->getNumTabs() > 2) {
+        if (mConnectTab->getNumTabs() >= kConnectTabsWithRecents) {
             // move recents to main connect component, out of tab
             int adjcurrtab = jmax(0, mConnectTab->getCurrentTabIndex() - 1);
 
@@ -694,13 +732,13 @@ void ConnectView::resized()  {
             updateLayout();
         }
     } else {
-        if (mConnectTab->getNumTabs() < 3) {
+        if (mConnectTab->getNumTabs() < kConnectTabsWithRecents) {
             int tabsel = mConnectTab->getCurrentTabIndex();
             mRecentsGroup->removeChildComponent(mRecentsContainer.get());
             mRecentsGroup->setVisible(false);
 
-            mConnectTab->addTab(TRANS("RECENTS"), Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0), mRecentsContainer.get(), false);
-            mConnectTab->moveTab(2, 0);
+            mConnectTab->addTab(TRANS("RECENTS"), SlimUi::card(), mRecentsContainer.get(), false);
+            mConnectTab->moveTab(mConnectTab->getNumTabs() - 1, 0);
             mConnectTab->setCurrentTabIndex(tabsel + 1);
             updateLayout();
         }
@@ -713,7 +751,12 @@ void ConnectView::resized()  {
                                        mServerConnectViewport->getWidth() - (mServerConnectViewport->getHeight() < minHeight ? mServerConnectViewport->getScrollBarThickness() : 0 ),
                                        jmax(minHeight, mServerConnectViewport->getHeight()));
 
-    //remoteBox.performLayout(mDirectConnectContainer->getLocalBounds().withSizeKeepingCentre(jmin(400, mDirectConnectContainer->getWidth()), mDirectConnectContainer->getHeight()));
+    if (mDirectConnectViewport)
+    {
+        const int directH = jmax (280, mDirectConnectViewport->getHeight());
+        mDirectConnectContainer->setBounds (0, 0, jmax (320, mDirectConnectViewport->getWidth()), directH);
+        remoteBox.performLayout (mDirectConnectContainer->getLocalBounds().withSizeKeepingCentre (jmin (400, mDirectConnectContainer->getWidth()), mDirectConnectContainer->getHeight()));
+    }
     serverBox.performLayout(mServerConnectContainer->getLocalBounds().withSizeKeepingCentre(jmin(400, mServerConnectContainer->getWidth()), mServerConnectContainer->getHeight()));
 
     //mPublicServerConnectContainer->setBounds(0,0,
@@ -722,13 +765,15 @@ void ConnectView::resized()  {
 
 
 
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     publicGroupsBox.performLayout(mPublicServerConnectContainer->getLocalBounds());
     //publicGroupsBox.performLayout(mPublicServerConnectContainer->getLocalBounds().withSizeKeepingCentre(jmin(400, mPublicServerConnectContainer->getWidth()), mPublicServerConnectContainer->getHeight()));
 
     mPublicGroupsListBox->setBounds(mPublicGroupComponent->getLocalBounds().reduced(4).withTrimmedTop(10));
+#endif
 
 
-    if (mConnectTab->getNumTabs() < 3) {
+    if (mConnectTab->getNumTabs() < kConnectTabsWithRecents) {
         mRecentsContainer->setBounds(mRecentsGroup->getLocalBounds().reduced(4).withTrimmedTop(10));
     }
     recentsBox.performLayout(mRecentsContainer->getLocalBounds());
@@ -750,7 +795,7 @@ void ConnectView::groupJoinFailed()
 void ConnectView::showActiveGroupTab()
 {
 
-    int adjindex = mConnectTab->getCurrentTabIndex() + (mConnectTab->getNumTabs() > 2 ? 0 : 1);
+    int adjindex = mConnectTab->getCurrentTabIndex() + (mConnectTab->getNumTabs() >= kConnectTabsWithRecents ? 0 : 1);
     if (adjindex != 1 && adjindex != 2) {
         if (currConnectionInfo.groupIsPublic) {
             showPublicGroupTab();
@@ -762,12 +807,30 @@ void ConnectView::showActiveGroupTab()
 
 void ConnectView::showPrivateGroupTab()
 {
-    mConnectTab->setCurrentTabIndex(mConnectTab->getNumTabs() > 2 ? 1 : 0);
+    for (int i = 0; i < mConnectTab->getNumTabs(); ++i)
+    {
+        if (mConnectTab->getTabContentComponent (i) == mServerConnectViewport.get())
+        {
+            mConnectTab->setCurrentTabIndex (i);
+            return;
+        }
+    }
 }
 
 void ConnectView::showPublicGroupTab()
 {
-    mConnectTab->setCurrentTabIndex(mConnectTab->getNumTabs() > 2 ? 2 : 1);
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
+    for (int i = 0; i < mConnectTab->getNumTabs(); ++i)
+    {
+        if (mConnectTab->getTabContentComponent (i) == mPublicServerConnectContainer.get()
+            || mConnectTab->getTabContentComponent (i) == mPublicServerConnectViewport.get())
+        {
+            mConnectTab->setCurrentTabIndex (i);
+            return;
+        }
+    }
+#endif
+    showPrivateGroupTab();
 }
 
 bool ConnectView::getServerGroupAndPasswordText(String & retgroup, String & retpass) const
@@ -795,12 +858,12 @@ void ConnectView::visibilityChanged ()
 
 void ConnectView::connectTabChanged (int newCurrentTabIndex)
 {
-    // normaliza index to have recents as 0
-    int adjindex = mConnectTab->getNumTabs() < 3 ? newCurrentTabIndex + 1 : newCurrentTabIndex;
+    ignoreUnused (newCurrentTabIndex);
 
-    // public groups
-    if (adjindex == 2) {
-        // put focus somewhere a text editor won't activate on ios
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
+    auto* content = mConnectTab->getCurrentContentComponent();
+    if (content == mPublicServerConnectContainer.get()
+        || content == mPublicServerConnectViewport.get()) {
         if (mPublicServerAddGroupButton->isShowing()) {
             mPublicServerAddGroupButton->grabKeyboardFocus();
         }
@@ -810,14 +873,16 @@ void ConnectView::connectTabChanged (int newCurrentTabIndex)
         currConnectionInfo.groupName = mServerGroupEditor->getText().trim();
         currConnectionInfo.groupPassword = mServerGroupPasswordEditor->getText();
     }
-    else if (adjindex == 1) {
-        // private groups
+    else
+#endif
+    if (mConnectTab->getCurrentContentComponent() == mServerConnectViewport.get()) {
         resetPrivateGroupLabels();
     }
 }
 
 void ConnectView::publicGroupLogin()
 {
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     String hostport = mPublicServerHostEditor->getText();
     DBG("Public host enter pressed");
     // parse it
@@ -861,11 +926,12 @@ void ConnectView::publicGroupLogin()
             });
         }
     }
+#endif
 }
 
 bool ConnectView::copyInfoToClipboard(bool singleURL, String * retmessage)
 {
-    String message = TRANS("Share this link with others to connect with SonoBus:") + " \n";
+    String message = TRANS("Share this link with others to connect with Netlay:") + " \n";
 
     String hostport = mServerHostEditor->getText();
     if (hostport.isEmpty()) {
@@ -933,12 +999,14 @@ void ConnectView::textEditorReturnKeyPressed (TextEditor& ed)
 {
     DBG("Return pressed");
 
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     if (&ed == mPublicServerHostEditor.get() || &ed == mPublicServerUsernameEditor.get()) {
         publicGroupLogin();
     }
     else if (&ed == mPublicServerGroupEditor.get()) {
         buttonClicked(mPublicServerAddGroupButton.get());
     }
+#endif
 
 
     if (isVisible() && mServerConnectButton->isShowing()) {
@@ -946,11 +1014,13 @@ void ConnectView::textEditorReturnKeyPressed (TextEditor& ed)
         mServerConnectButton->grabKeyboardFocus();
         //mServerConnectButton->setWantsKeyboardFocus(false);
     }
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     else if (isVisible() && mPublicServerAddGroupButton->isShowing()) {
         //mServerConnectButton->setWantsKeyboardFocus(true);
         mPublicServerAddGroupButton->grabKeyboardFocus();
         //mServerConnectButton->setWantsKeyboardFocus(false);
     }
+#endif
     //else if (isVisible() && mDirectConnectButton->isShowing()) {
         //mServerConnectButton->setWantsKeyboardFocus(true);
     //    mDirectConnectButton->grabKeyboardFocus();
@@ -971,7 +1041,11 @@ void ConnectView::textEditorEscapeKeyPressed (TextEditor& ed)
 
 void ConnectView::textEditorTextChanged (TextEditor& ed)
 {
-    if (&ed == mPublicServerUsernameEditor.get() || &ed == mServerUsernameEditor.get()) {
+    if (&ed == mServerUsernameEditor.get()
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
+        || &ed == mPublicServerUsernameEditor.get()
+#endif
+        ) {
         // try to set the current username, it will fail if we are connected, no big deal
         processor.setCurrentUsername(ed.getText().trim());
     }
@@ -981,9 +1055,11 @@ void ConnectView::textEditorTextChanged (TextEditor& ed)
 void ConnectView::textEditorFocusLost (TextEditor& ed)
 {
     // only one we care about live is udp port
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     if (&ed == mPublicServerHostEditor.get() || &ed == mPublicServerUsernameEditor.get()) {
         publicGroupLogin();
     }
+#endif
 
 }
 
@@ -1056,6 +1132,7 @@ void ConnectView::buttonClicked (Button* buttonThatWasClicked)
         //mConnectionTimeLabel->setText("", dontSendNotification);
 
     }
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     else if (buttonThatWasClicked == mPublicServerAddGroupButton.get()) {
 
         String hostport = mPublicServerHostEditor->getText();
@@ -1087,6 +1164,7 @@ void ConnectView::buttonClicked (Button* buttonThatWasClicked)
         //mConnectionTimeLabel->setText("", dontSendNotification);
 
     }
+#endif
     else if (buttonThatWasClicked == mServerGroupPasswordShowButton.get()) {
         mServerGroupPasswordShowButton->setToggleState(!mServerGroupPasswordShowButton->getToggleState(), dontSendNotification);
         currConnectionInfo.userName = mServerUsernameEditor->getText().trim();
@@ -1094,11 +1172,13 @@ void ConnectView::buttonClicked (Button* buttonThatWasClicked)
         currConnectionInfo.groupPassword = mServerGroupPasswordEditor->getText();
         updateState();
     }
+#if SONOBUS_FEATURE_RANDOM_GROUP
     else if (buttonThatWasClicked == mServerGroupRandomButton.get()) {
         // randomize group name
         String rgroup = mRandomSentence->randomSentence();
         mServerGroupEditor->setText(rgroup, dontSendNotification);
     }
+#endif
     else if (buttonThatWasClicked == mServerPasteButton.get()) {
         if (attemptToPasteConnectionFromClipboard()) {
             updateServerFieldsFromConnectionInfo();
@@ -1136,7 +1216,10 @@ void ConnectView::buttonClicked (Button* buttonThatWasClicked)
         //showPopTip(TRANS("Copied connection info to clipboard for you to share with others"), 3000, mServerCopyButton.get());
     }
     else if (buttonThatWasClicked == mConnectCloseButton.get()) {
-        setVisible(false);
+        if (onRequestDismiss)
+            onRequestDismiss();
+        else
+            setVisible(false);
 
         processor.setWatchPublicGroups(false);
 
@@ -1155,51 +1238,33 @@ void ConnectView::buttonClicked (Button* buttonThatWasClicked)
 
 void ConnectView::showAdvancedMenu()
 {
-    // jlc
-    Array<GenericItemChooserItem> items;
-    items.add(GenericItemChooserItem(TRANS("Connect to Raw Address...")));
+    showDirectIpTab();
+}
 
-    Component* dw = mConnectMenuButton->findParentComponentOfClass<AudioProcessorEditor>();
-    if (!dw) dw = mConnectMenuButton->findParentComponentOfClass<Component>();
-    Rectangle<int> bounds =  dw->getLocalArea(nullptr, mConnectMenuButton->getScreenBounds());
+void ConnectView::showDirectIpTab()
+{
+    auto* directContent = mDirectConnectViewport ? (Component*) mDirectConnectViewport.get()
+                                                 : (Component*) mDirectConnectContainer.get();
 
-    SafePointer<ConnectView> safeThis(this);
-
-    auto callback = [safeThis,dw,bounds](GenericItemChooser* chooser,int index) mutable {
-        if (!safeThis) return;
-        auto wrap = std::make_unique<Viewport>();
-
-        int defWidth = 320;
-#if JUCE_IOS || JUCE_ANDROID
-        int defHeight = 300;
-#else
-        int defHeight = 250;
-#endif
-
-        int extrawidth = 0;
-        if (defHeight > dw->getHeight() - 24) {
-            extrawidth = wrap->getScrollBarThickness() + 1;
+    for (int i = 0; i < mConnectTab->getNumTabs(); ++i)
+    {
+        if (mConnectTab->getTabContentComponent (i) == directContent)
+        {
+            mConnectTab->setCurrentTabIndex (i);
+            return;
         }
+    }
+}
 
-        wrap->setSize(jmin(defWidth + extrawidth, dw->getWidth() - 10), jmin(defHeight, dw->getHeight() - 24));
-
-        safeThis->mDirectConnectContainer->setBounds(Rectangle<int>(0,0,defWidth,defHeight));
-
-        wrap->setViewedComponent(safeThis->mDirectConnectContainer.get(), false);
-        safeThis->mDirectConnectContainer->setVisible(true);
-
-        safeThis->remoteBox.performLayout(safeThis->mDirectConnectContainer->getLocalBounds().withSizeKeepingCentre(jmin(400, safeThis->mDirectConnectContainer->getWidth()), safeThis->mDirectConnectContainer->getHeight()));
-
-        // show direct connect container
-        safeThis->directConnectCalloutBox = & CallOutBox::launchAsynchronously (std::move(wrap), bounds , dw, false);
-        if (CallOutBox * box = dynamic_cast<CallOutBox*>(safeThis->directConnectCalloutBox.get())) {
-            box->setDismissalMouseClicksAreAlwaysConsumed(true);
-        }
-
-    };
-
-    GenericItemChooser::launchPopupChooser(items, bounds, dw, callback, -1, dw ? dw->getHeight()-30 : 0);
-
+void ConnectView::setEmbeddedInShell (bool embedded)
+{
+    mEmbeddedInShell = embedded;
+    mConnectCloseButton->setVisible (! embedded);
+    mConnectTitle->setVisible (! embedded);
+    mConnectMenuButton->setVisible (! embedded);
+    mConnectComponentBg->setVisible (! embedded);
+    updateLayout();
+    resized();
 }
 
 void ConnectView::connectWithInfo(const AooServerConnectionInfo & info, bool allowEmptyGroup)
@@ -1207,13 +1272,16 @@ void ConnectView::connectWithInfo(const AooServerConnectionInfo & info, bool all
     currConnectionInfo = info;
 
     if (currConnectionInfo.groupName.isEmpty() && !allowEmptyGroup) {
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         if (info.groupIsPublic) {
             mPublicServerStatusInfoLabel->setText(TRANS("You need to specify a group name!"), dontSendNotification);
             mPublicServerGroupEditor->setColour(TextEditor::backgroundColourId, Colour(0xff880000));
             mPublicServerGroupEditor->repaint();
             mPublicServerStatusInfoLabel->setVisible(true);
         }
-        else {
+        else
+#endif
+        {
             mServerStatusLabel->setText(TRANS("You need to specify a group name!"), dontSendNotification);
             mServerGroupEditor->setColour(TextEditor::backgroundColourId, Colour(0xff880000));
             mServerGroupEditor->repaint();
@@ -1225,18 +1293,23 @@ void ConnectView::connectWithInfo(const AooServerConnectionInfo & info, bool all
     else {
         mServerGroupEditor->setColour(TextEditor::backgroundColourId, Colour(0xff050505));
         mServerGroupEditor->repaint();
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         mPublicServerGroupEditor->setColour(TextEditor::backgroundColourId, Colour(0xff050505));
         mPublicServerGroupEditor->repaint();
+#endif
     }
 
     if (currConnectionInfo.userName.trim().isEmpty()) {
         String mesg = TRANS("You need to specify a user name!");
 
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         if (info.groupIsPublic) {
             mPublicServerStatusInfoLabel->setText(mesg, dontSendNotification);
             mPublicServerUsernameEditor->setColour(TextEditor::backgroundColourId, Colour(0xff880000));
             mPublicServerUsernameEditor->repaint();
-        } else {
+        } else
+#endif
+        {
             mServerStatusLabel->setText(mesg, dontSendNotification);
             mServerUsernameEditor->setColour(TextEditor::backgroundColourId, Colour(0xff880000));
             mServerUsernameEditor->repaint();
@@ -1249,8 +1322,10 @@ void ConnectView::connectWithInfo(const AooServerConnectionInfo & info, bool all
     else {
         mServerUsernameEditor->setColour(TextEditor::backgroundColourId, Colour(0xff050505));
         mServerUsernameEditor->repaint();
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         mPublicServerUsernameEditor->setColour(TextEditor::backgroundColourId, Colour(0xff050505));
         mPublicServerUsernameEditor->repaint();
+#endif
     }
 
     //mServerGroupPasswordEditor->setColour(TextEditor::backgroundColourId, Colour(0xff880000));
@@ -1271,16 +1346,21 @@ void ConnectView::connectWithInfo(const AooServerConnectionInfo & info, bool all
         mServerHostEditor->setColour(TextEditor::backgroundColourId, Colour(0xff050505));
         mServerHostEditor->repaint();
 
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         mPublicServerHostEditor->setColour(TextEditor::backgroundColourId, Colour(0xff050505));
         mPublicServerHostEditor->repaint();
+#endif
     }
     else {
         String mesg = TRANS("Server address is invalid!");
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         if (info.groupIsPublic) {
             mPublicServerStatusInfoLabel->setText(mesg, dontSendNotification);
             mPublicServerHostEditor->setColour(TextEditor::backgroundColourId, Colour(0xff880000));
             mPublicServerHostEditor->repaint();
-        } else {
+        } else
+#endif
+        {
             mServerStatusLabel->setText(mesg, dontSendNotification);
             mServerHostEditor->setColour(TextEditor::backgroundColourId, Colour(0xff880000));
             mServerHostEditor->repaint();
@@ -1300,10 +1380,12 @@ void ConnectView::updateRecents()
 
 void ConnectView::updatePublicGroups()
 {
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     publicGroupsListModel.updateState();
     mPublicGroupsListBox->updateContent();
     mPublicGroupsListBox->repaint();
     mPublicGroupsListBox->deselectAllRows();
+#endif
 }
 
 void ConnectView::resetPrivateGroupLabels()
@@ -1426,10 +1508,12 @@ void ConnectView::updateServerStatusLabel(const String & mesg, bool mainonly)
 
     if (!mainonly) {
         mServerStatusLabel->setText(mesg, dontSendNotification);
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         mPublicServerStatusInfoLabel->setText(mesg, dontSendNotification);
+        mPublicServerStatusInfoLabel->setVisible(true);
+#endif
         mServerInfoLabel->setVisible(false);
         mServerStatusLabel->setVisible(true);
-        mPublicServerStatusInfoLabel->setVisible(true);
     }
 }
 
@@ -1438,18 +1522,25 @@ void ConnectView::updateServerFieldsFromConnectionInfo()
 {
     if (currConnectionInfo.serverPort == DEFAULT_SERVER_PORT) {
         mServerHostEditor->setText( currConnectionInfo.serverHost, false);
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         mPublicServerHostEditor->setText( currConnectionInfo.serverHost, false);
+#endif
     } else {
         String hostport;
         hostport << currConnectionInfo.serverHost << ":" << currConnectionInfo.serverPort;
         mServerHostEditor->setText( hostport, false);
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         mPublicServerHostEditor->setText( hostport, false);
+#endif
     }
     mServerUsernameEditor->setText(currConnectionInfo.userName, false);
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
     mPublicServerUsernameEditor->setText(currConnectionInfo.userName, false);
     if (currConnectionInfo.groupIsPublic) {
         mPublicServerGroupEditor->setText(currConnectionInfo.groupName, false);
-    } else if (currConnectionInfo.groupName.isNotEmpty()){
+    } else
+#endif
+    if (currConnectionInfo.groupName.isNotEmpty()){
         mServerGroupEditor->setText(currConnectionInfo.groupName, false);
     }
 
@@ -1761,7 +1852,11 @@ void ConnectView::PublicGroupsListModel::groupSelected(int rowNumber)
     else {
 
         AooServerConnectionInfo cinfo;
+#if SONOBUS_FEATURE_PUBLIC_GROUPS
         cinfo.userName = parent->mPublicServerUsernameEditor->getText().trim();
+#else
+        cinfo.userName = parent->mServerUsernameEditor->getText().trim();
+#endif
         cinfo.groupName = ginfo.groupName;
         cinfo.groupIsPublic = true;
         cinfo.serverHost = parent->currConnectionInfo.serverHost;

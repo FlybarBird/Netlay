@@ -36,9 +36,9 @@ endif()
 # `project()` command. `project()` sets up some helpful variables that describe source/binary
 # directories, and the current project version. This is a standard CMake command.
 
-project(SonoBus VERSION 1.7.2)
+project(SonoBus VERSION 1.1.0)
 
-set(BUILDVERSION 80)
+set(BUILDVERSION 110)
 
 
 # If you've installed JUCE somehow (via a package manager, or directly using the CMake install
@@ -82,37 +82,8 @@ juce_add_modules(deps/ff_meters)
 
 
 
-set (FormatsToBuild VST3 Standalone)
-
-# On Mac, a AU version will be built too
-if (APPLE)
-    list (APPEND FormatsToBuild AU)
-endif()
-
-# On Linux, LV2 will be built too
-if (UNIX)
-    list (APPEND FormatsToBuild LV2)
-endif()
-
-# If you are building a VST2 or AAX plugin, CMake needs to be told where to find these SDKs on your
-# system. This setup should be done before calling `juce_add_plugin`.
-
-#juce_set_vst2_sdk_path("../VST2_SDK")
-#juce_set_aax_sdk_path("../AAX_SDK_2p3p2")
-
-
-if (AAX_SDK_PATH)
-    juce_set_aax_sdk_path (${AAX_SDK_PATH})
-    
-    if (APPLE OR (NOT ("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32")))
-      list (APPEND FormatsToBuild AAX)
-    endif()
-endif()
-
-if (VST2_SDK_PATH)
-    juce_set_vst2_sdk_path (${VST2_SDK_PATH})
-    list (APPEND FormatsToBuild VST)
-endif()
+# Slim fork: standalone app only (no VST3/AU/LV2/AAX/VST2)
+set (FormatsToBuild Standalone)
 
 
 set (MacPList "<plist version=\"1.0\">
@@ -155,12 +126,12 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         NEEDS_MIDI_INPUT TRUE
         NEEDS_MIDI_OUTPUT TRUE
         EDITOR_WANTS_KEYBOARD_FOCUS TRUE
-        COMPANY_NAME "Sonosaurus"
-        BUNDLE_ID "com.Sonosaurus.SonoBus"
+        COMPANY_NAME "Netlay"
+        BUNDLE_ID "com.netlay.Netlay"
         MICROPHONE_PERMISSION_ENABLED TRUE
         
-        ICON_BIG "images/sonobus_icon_mac_1024.png"
-        ICON_SMALL "images/sonobus_icon_mac_256.png"
+        ICON_BIG "images/netlay_icon_1024.png"
+        ICON_SMALL "images/netlay_icon_256.png"
         NEEDS_WEB_BROWSER FALSE
         VST2_CATEGORY "${vst2cat}"
         VST3_CATEGORIES "${vst3cats}"
@@ -179,7 +150,7 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         PLUGIN_MANUFACTURER_CODE Sono
         PLUGIN_CODE ${plugincode}
         FORMATS ${formats}
-        DESCRIPTION "SonoBus - Network Audio"
+        DESCRIPTION "Netlay - Network Audio"
         PRODUCT_NAME "${product_name}")
 
     juce_generate_juce_header("${target_name}")
@@ -240,8 +211,8 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
 
     set(SourceFiles
         ${PlatSourceFiles}
-        Source/AutoUpdater.cpp
-        Source/AutoUpdater.h
+        Source/AppShell.cpp
+        Source/AppShell.h
         Source/BeatToggleGrid.cpp
         Source/BeatToggleGrid.h
         Source/ChannelGroup.cpp
@@ -250,14 +221,19 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         Source/ChannelGroupsView.h
         Source/ChatView.cpp
         Source/ChatView.h
-        Source/CompressorView.h
         Source/ConnectView.cpp
         Source/ConnectView.h
+        Source/ConnectPage.cpp
+        Source/ConnectPage.h
         Source/DebugLogC.h
+        Source/MixerPage.cpp
+        Source/MixerPage.h
+        Source/RemoteControlPage.cpp
+        Source/RemoteControlPage.h
+        Source/RemoteMixTypes.h
+        Source/SonobusFeatures.h
         Source/EffectParams.cpp
         Source/EffectParams.h
-        Source/EffectsBaseView.h
-        Source/ExpanderView.h
         Source/GenericItemChooser.cpp
         Source/GenericItemChooser.h
         Source/JitterBufferMeter.cpp
@@ -268,25 +244,23 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         Source/LatencyMeasurer.h
         Source/LevelMeterLookAndFeelMethods.h
         Source/LocalLatencyMeasurer.h
-        Source/MVerb.h
-        Source/Metronome.cpp
-        Source/Metronome.h
         Source/MonitorDelayView.h
         Source/OptionsView.cpp
         Source/OptionsView.h
-        Source/ParametricEqView.h
         Source/PeersContainerView.cpp
         Source/PeersContainerView.h
-        Source/PolarityInvertView.h
+        Source/PeersPage.cpp
+        Source/PeersPage.h
         Source/RandomSentenceGenerator.cpp
         Source/RandomSentenceGenerator.h
-        Source/ReverbSendView.h
-        Source/ReverbView.h
         Source/RunCumulantor.cpp
         Source/RunCumulantor.h
         Source/RunningCumulant.h
         Source/SampleEditView.cpp
         Source/SampleEditView.h
+        Source/SettingsPage.cpp
+        Source/SettingsPage.h
+        Source/SlimUi.h
         Source/SonoCallOutBox.cpp
         Source/SonoCallOutBox.h
         Source/SonoChoiceButton.cpp
@@ -315,6 +289,8 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         Source/SoundboardProcessor.h
         Source/SoundboardView.cpp
         Source/SoundboardView.h
+        Source/SoundboardPage.cpp
+        Source/SoundboardPage.h
         Source/SoundSampleButtonColourPicker.cpp
         Source/SoundSampleButtonColourPicker.h
         Source/SonobusPluginEditor.cpp
@@ -328,12 +304,7 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         Source/VersionInfo.cpp
         Source/VersionInfo.h
         Source/WaveformTransportComponent.h
-        Source/faustCompressor.h
-        Source/faustExpander.h
-        Source/faustLimiter.h
-        Source/faustParametricEQ.h
         Source/mtdm.h
-        Source/zitaRev.h
     )
     set(AOOSourceFiles        
         deps/aoo/lib/src/SLIP.hpp
@@ -455,35 +426,18 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         JUCE_LOAD_CURL_SYMBOLS_LAZILY=1
         FF_AUDIO_ALLOW_ALLOCATIONS_IN_MEASURE_BLOCK=0
         SONOBUS_BUILD_VERSION="${VERSION}"
+        SONOBUS_SLIM=1
         ${PLAT_COMPILE_DEFS} )
 
     juce_add_binary_data("${target_name}_SBData" SOURCES
-        Source/wordmaker.g
-        Source/GoNotoKurrent-Regular.ttf
-	Source/DejaVuSans.ttf
-        localization/localized_de.txt
-        localization/localized_es.txt
-        localization/localized_fr.txt
-        localization/localized_it.txt
-        localization/localized_ja.txt
-        localization/localized_nl.txt
-        localization/localized_pt-br.txt
-        localization/localized_pt-pt.txt
-        localization/localized_ko.txt
-        localization/localized_ru.txt
-        localization/localized_zh-hans.txt
+        Source/DejaVuSans.ttf
         images/arrow-up-narrow.svg
         images/arrow-down-narrow.svg
         images/dots.svg
-        images/bar_click.wav
-        images/beat_click.wav
-        images/chat.svg
-        images/chat_dots.svg
         images/checkmark.svg
         images/chevron_forward.svg
         images/continue.svg
         images/copy_icon.svg
-        images/dice_icon_128.png
         images/dispfull.svg
         images/dispminimal.svg
         images/dots.svg
@@ -511,7 +465,6 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         images/list_icon1.png
         images/loop_icon.svg
         images/loop_off_icon.png
-        images/met.svg
         images/mic.svg
         images/mic_disabled.svg
         images/mic_pointing.svg
@@ -536,10 +489,6 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         images/plus_icon.svg
         images/power.svg
         images/power_sel.svg
-        images/record.svg
-        images/record_active.svg
-        images/record_active_alt.svg
-        images/rectape.svg
         images/reset_buffer_icon.svg
         images/send.svg
         images/send_group.svg
@@ -550,6 +499,8 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         images/skipforward_icon.svg
         images/sonobus_logo_96.png
         images/sonobus_title_small.png
+        images/netlay_logo.png
+        images/netlay_wordmark.png
         images/soundboard.svg
         images/speaker.svg
         images/speaker_disabled.svg
@@ -558,8 +509,6 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
         images/toggle.svg
         images/triangle_disclosure.svg
         images/triangle_disclosure_right.svg
-        images/urei_main.wav
-        images/videocam-outline.svg
         images/x_icon.svg
     )
 
@@ -620,12 +569,6 @@ function(sono_add_custom_plugin_target target_name product_name formats is_instr
             
 endfunction()
 
-# most of the targets
-sono_add_custom_plugin_target(SonoBus SonoBus "${FormatsToBuild}" FALSE  "NBus")
-
-# Mobile targets
-#sono_add_custom_plugin_target(SonoBusMobile "AUv3 Standalone" FALSE "NBus")
-
-# add VSTi target
-sono_add_custom_plugin_target(SonoBusInst "SonoBusInstrument" "VST3" TRUE  "IBus")
+# Slim fork: standalone app only (no VSTi / mobile plugin targets)
+sono_add_custom_plugin_target(SonoBus Netlay "${FormatsToBuild}" FALSE  "NBus")
 

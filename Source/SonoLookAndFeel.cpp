@@ -4,8 +4,8 @@
 
 #include "SonoLookAndFeel.h"
 #include "SonoDrawableButton.h"
-//#include "ConfigurationRowView.h"
 #include "SonoTextButton.h"
+#include "SlimUi.h"
 
 #include <JuceHeader.h>
 
@@ -54,70 +54,66 @@ SonoLookAndFeel::SonoLookAndFeel(bool useUniversalFont) : mUseUniversalFont(useU
 
     setColourScheme(getDarkColourScheme());
 
-    getCurrentColourScheme().setUIColour(ColourScheme::UIColour::windowBackground, Colour::fromFloatRGBA(0.0, 0.0, 0.0, 1.0));
-    getCurrentColourScheme().setUIColour(ColourScheme::UIColour::widgetBackground, Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0));
-    getCurrentColourScheme().setUIColour(ColourScheme::UIColour::outline, Colour::fromFloatRGBA(0.3, 0.3, 0.3, 0.5));
+    getCurrentColourScheme().setUIColour(ColourScheme::UIColour::windowBackground, SlimUi::background());
+    getCurrentColourScheme().setUIColour(ColourScheme::UIColour::widgetBackground, SlimUi::card());
+    getCurrentColourScheme().setUIColour(ColourScheme::UIColour::outline, SlimUi::outline());
 
-    setColour (Label::textColourId, Colour (0xffcccccc));
-    setColour (Label::textWhenEditingColourId, Colour (0xffe9e9e9));
+    setColour (Label::textColourId, SlimUi::text());
+    setColour (Label::textWhenEditingColourId, SlimUi::text());
     
-    setColour(ResizableWindow::backgroundColourId, Colour(0xff111111));
+    setColour(ResizableWindow::backgroundColourId, SlimUi::background());
     
-    //setColour (TextButton::buttonColourId, Colour (0xff363636));
-    setColour (TextButton::buttonColourId, Colour::fromFloatRGBA(0.15, 0.15, 0.15, 0.7)); // old one
-    //setColour (TextButton::buttonColourId, Colour::fromFloatRGBA(0.15, 0.15, 0.15, 0.0));
-    //setColour (TextButton::buttonOnColourId, Colour (0xff3d70c8));
-    setColour (TextButton::buttonOnColourId, Colour::fromFloatRGBA(0.5, 0.4, 0.6, 0.8));
-    setColour (TextButton::textColourOnId, Colour (0xddcccccc));
-    setColour (TextButton::textColourOffId, Colour (0xdde9e9e9));
+    setColour (TextButton::buttonColourId, SlimUi::cardRaised());
+    setColour (TextButton::buttonOnColourId, SlimUi::accentPurple());
+    setColour (TextButton::textColourOnId, SlimUi::text());
+    setColour (TextButton::textColourOffId, SlimUi::text());
 
-    setColour (ToggleButton::textColourId, Colour (0xddcccccc));
+    setColour (ToggleButton::textColourId, SlimUi::textDim());
 
     
-    setColour (SonoTextButton::outlineColourId, Colour::fromFloatRGBA(0.3, 0.3, 0.3, 0.5));
+    setColour (SonoTextButton::outlineColourId, SlimUi::outline());
 
-    setColour (ScrollBar::ColourIds::thumbColourId, Colour::fromFloatRGBA(0.4, 0.4, 0.4, 0.6));
+    setColour (ScrollBar::ColourIds::thumbColourId, SlimUi::accentPurple().withAlpha (0.7f));
     
-    //setColour (ComboBox::backgroundColourId, Colour (0xff161616));
-    setColour (ComboBox::backgroundColourId, Colour::fromFloatRGBA(0.15, 0.15, 0.15, 0.7));
-    setColour (ComboBox::textColourId, Colour (0xffe9e9e9));
-    setColour (ComboBox::outlineColourId, Colour::fromFloatRGBA(0.3, 0.3, 0.3, 0.5));
+    setColour (ComboBox::backgroundColourId, SlimUi::cardRaised());
+    setColour (ComboBox::textColourId, SlimUi::text());
+    setColour (ComboBox::outlineColourId, SlimUi::outline());
 
-    setColour (TextEditor::backgroundColourId, Colour (0xff050505));
-    setColour (TextEditor::textColourId, Colour (0xffe9e9e9));
-    setColour (TextEditor::highlightColourId, Colour (0xff5959f9));
-    setColour (TextEditor::outlineColourId, Colour::fromFloatRGBA(0.3, 0.3, 0.3, 0.5));
-    setColour (TextEditor::focusedOutlineColourId, Colour::fromFloatRGBA(0.5, 0.5, 0.5, 0.7));
+    setColour (TextEditor::backgroundColourId, SlimUi::sidebar());
+    setColour (TextEditor::textColourId, SlimUi::text());
+    setColour (TextEditor::highlightColourId, SlimUi::accentBlue().withAlpha (0.45f));
+    setColour (TextEditor::outlineColourId, SlimUi::outline());
+    setColour (TextEditor::focusedOutlineColourId, SlimUi::accentBlue().withAlpha (0.8f));
 
-    setColour (Slider::backgroundColourId, Colour::fromFloatRGBA(0.2, 0.2, 0.2, 1.0));
-    setColour (Slider::rotarySliderOutlineColourId, Colour::fromFloatRGBA(0.2, 0.2, 0.2, 1.0));
-    setColour (Slider::textBoxTextColourId, Colour(0xddcccccc));
-    setColour (Slider::textBoxBackgroundColourId, Colour::fromFloatRGBA(0.05, 0.05, 0.05, 1.0));
-    setColour (Slider::textBoxHighlightColourId, Colour (0xaa555555));
-    setColour (Slider::textBoxOutlineColourId, Colour::fromFloatRGBA(0.3, 0.3, 0.3, 0.5));
+    setColour (Slider::backgroundColourId, SlimUi::cardRaised());
+    setColour (Slider::rotarySliderOutlineColourId, SlimUi::cardRaised());
+    setColour (Slider::textBoxTextColourId, SlimUi::textDim());
+    setColour (Slider::textBoxBackgroundColourId, SlimUi::sidebar());
+    setColour (Slider::textBoxHighlightColourId, SlimUi::accentBlue().withAlpha (0.35f));
+    setColour (Slider::textBoxOutlineColourId, SlimUi::outline());
     
-    setColour (Slider::trackColourId, Colour::fromFloatRGBA(0.1, 0.4, 0.6, 0.8));
-    setColour (Slider::thumbColourId, Colour::fromFloatRGBA(0.5, 0.4, 0.6, 0.9));
-    //setColour (Slider::thumbColourId, Colour::fromFloatRGBA(0.2, 0.5, 0.7, 1.0));
-    setColour (Slider::rotarySliderFillColourId, Colour::fromFloatRGBA(0.5, 0.4, 0.6, 0.9));
+    setColour (Slider::trackColourId, SlimUi::accentBlue());
+    setColour (Slider::thumbColourId, SlimUi::text());
+    setColour (Slider::rotarySliderFillColourId, SlimUi::accentBlue());
     
-    setColour (TabbedButtonBar::tabOutlineColourId, Colour::fromFloatRGBA(0.3, 0.3, 0.3, 0.5));
+    setColour (TabbedButtonBar::tabOutlineColourId, SlimUi::outline());
+    setColour (TabbedButtonBar::frontTextColourId, SlimUi::accentLavender());
+    setColour (TabbedButtonBar::tabTextColourId, SlimUi::textDim());
 
 
     
-    setColour (ListBox::backgroundColourId, Colour::fromFloatRGBA(0.15, 0.15, 0.15, 0.7));
-    setColour (ListBox::outlineColourId, Colour::fromFloatRGBA(0.3, 0.3, 0.3, 0.5));
+    setColour (ListBox::backgroundColourId, SlimUi::card());
+    setColour (ListBox::outlineColourId, SlimUi::outline());
 
-    setColour (BubbleComponent::backgroundColourId, Colour::fromFloatRGBA(0.25, 0.25, 0.25, 1.0));
-    setColour (BubbleComponent::outlineColourId, Colour::fromFloatRGBA(0.4, 0.4, 0.4, 0.5));
-    //setColour (TooltipWindow::textColourId, Colour(0xeecccccc));
-    setColour (TooltipWindow::textColourId, Colour(0xee222222));
-    setColour (TooltipWindow::backgroundColourId, Colour(0xeeffff99));
+    setColour (BubbleComponent::backgroundColourId, SlimUi::cardRaised());
+    setColour (BubbleComponent::outlineColourId, SlimUi::outline());
+    setColour (TooltipWindow::textColourId, SlimUi::text());
+    setColour (TooltipWindow::backgroundColourId, SlimUi::card());
 
-    setColour (PopupMenu::backgroundColourId, Colour::fromFloatRGBA(0.2, 0.2, 0.2, 1.0));
-    setColour (PopupMenu::highlightedBackgroundColourId, Colour::fromFloatRGBA(0.35, 0.35, 0.4, 1.0));
+    setColour (PopupMenu::backgroundColourId, SlimUi::cardRaised());
+    setColour (PopupMenu::highlightedBackgroundColourId, SlimUi::accentPurple());
 
-    setColour (SidePanel::backgroundColour, Colour::fromFloatRGBA(0.17, 0.17, 0.17, 1.0));
+    setColour (SidePanel::backgroundColour, SlimUi::sidebar());
 
 
     
@@ -130,14 +126,11 @@ SonoLookAndFeel::SonoLookAndFeel(bool useUniversalFont) : mUseUniversalFont(useU
     setColour (DrawableButton::textColourOnId, Colour (0xffe9e9e9));
 
     //setColour (DrawableButton::backgroundColourId, Colour (0xffb9b9b9));
-    setColour (DrawableButton::backgroundOnColourId, Colour::fromFloatRGBA(0.5, 0.4, 0.6, 0.8));
+    setColour (DrawableButton::backgroundOnColourId, SlimUi::accentPurple());
 
-    //setColour (ConfigurationRowView::backgroundColourId, Colour::fromFloatRGBA(0.05, 0.05, 0.05, 1.0));
-    //setColour (ConfigurationRowView::selectedBackgroundColourId, Colour::fromFloatRGBA(0.15, 0.15, 0.15, 1.0));
-
-    setColour(ToggleButton::tickColourId, Colour::fromFloatRGBA(0.4, 0.8, 1.0, 1.0));
+    setColour(ToggleButton::tickColourId, SlimUi::accentBlue());
     
-    setColour (DirectoryContentsDisplayComponent::highlightColourId, Colour::fromFloatRGBA(0.1, 0.4, 0.6, 0.9));
+    setColour (DirectoryContentsDisplayComponent::highlightColourId, SlimUi::accentBlue().withAlpha (0.85f));
     setColour (DirectoryContentsDisplayComponent::textColourId, Colour (0xffe9e9e9));
     // setColour (Label::textColourId, Colour (0xffe9e9e9));
 
@@ -147,9 +140,13 @@ SonoLookAndFeel::SonoLookAndFeel(bool useUniversalFont) : mUseUniversalFont(useU
     //setDefaultSansSerifTypefaceName(myFont.getTypefaceName());
 
     //myFont = Typeface::createSystemTypefaceFor (BinaryData::GillSans_ttc, BinaryData::GillSans_ttcSize);
-    myFont = Font(16 * fontScale);
+    myFont = SlimUi::displayRegular (16 * fontScale);
     
     setupDefaultMeterColours();
+    setColour (foleys::LevelMeter::lmMeterGradientLowColour, SlimUi::meterLow());
+    setColour (foleys::LevelMeter::lmMeterGradientMidColour, SlimUi::meterMid());
+    setColour (foleys::LevelMeter::lmMeterGradientMaxColour, SlimUi::meterHigh());
+    setColour (foleys::LevelMeter::lmMeterBackgroundColour, SlimUi::sidebar());
 
     if (auto * deflnf = dynamic_cast<SonoLookAndFeel*>(&LookAndFeel::getDefaultLookAndFeel())) {
         setLanguageCode(deflnf->languageCode, mUseUniversalFont);
@@ -177,6 +174,22 @@ void SonoLookAndFeel::setLanguageCode(const String & lang, bool useUniversalFont
 
 Typeface::Ptr SonoLookAndFeel::getTypefaceForFont (const Font& font)
 {
+#if JUCE_MAC
+    const auto name = font.getTypefaceName();
+    if (name == Font::getDefaultSansSerifFontName()
+        || name == ".AppleSystemUIFont"
+        || name == "SF Pro Display")
+    {
+        Font sys (font);
+        sys.setTypefaceName (".AppleSystemUIFont");
+        const bool wantBold = font.isBold()
+                              || font.getTypefaceStyle().containsIgnoreCase ("Bold")
+                              || font.getTypefaceStyle().containsIgnoreCase ("Heavy");
+        sys.setTypefaceStyle (wantBold ? "Bold" : "Regular");
+        return Typeface::createSystemTypefaceFor (sys);
+    }
+#endif
+
     DBG("get typeface for font " << font.getTypefaceName() << " with defaultsansser: " << Font::getDefaultSansSerifFontName());
     if (font.getTypefaceName() == Font::getDefaultSansSerifFontName())
     {
@@ -246,7 +259,7 @@ Typeface::Ptr SonoLookAndFeel::getTypefaceForFont (const Font& font)
 
                 //return Typeface::createSystemTypefaceFor (BinaryData::DejaVuSans_ttf, BinaryData::DejaVuSans_ttfSize);
                 //return Typeface::createSystemTypefaceFor (BinaryData::InterUnicode_ttf, BinaryData::InterUnicode_ttfSize);
-                return Typeface::createSystemTypefaceFor (BinaryData::GoNotoKurrentRegular_ttf, BinaryData::GoNotoKurrentRegular_ttfSize);
+                return Typeface::createSystemTypefaceFor (BinaryData::DejaVuSans_ttf, BinaryData::DejaVuSans_ttfSize);
             }
         }
     }
@@ -272,9 +285,9 @@ void SonoLookAndFeel::drawTooltip (Graphics& g, const String& text, int width, i
         .draw (g, { static_cast<float> (width), static_cast<float> (height) });
 }
 
-Font SonoLookAndFeel::getMenuBarFont (MenuBarComponent& menuBar, int /*itemIndex*/, const String& /*itemText*/)
+Font SonoLookAndFeel::getMenuBarFont (MenuBarComponent& menuBar, int /*itemIndex*/, const String& /*menuName*/)
 {
-    return Font (menuBar.getHeight() * 0.7f * fontScale);
+    return SlimUi::displayRegular (menuBar.getHeight() * 0.7f * fontScale);
 }
 
 //==============================================================================
@@ -385,7 +398,7 @@ void SonoLookAndFeel::createTabTextLayout (const TabBarButton& button, float len
                                           Colour colour, TextLayout& textLayout)
 {
     float fontsize = button.getExtraComponent() != nullptr ? jmin(depth, 32.0f) * 0.5f : jmin(depth, 32.0f) * 0.5f;
-    Font font = myFont.withHeight(fontsize * fontScale);
+    Font font = SlimUi::displayRegular (fontsize * fontScale);
     font.setUnderline (button.hasKeyboardFocus (false));
 
     AttributedString s;
@@ -403,7 +416,7 @@ void SonoLookAndFeel::drawTabButton (TabBarButton& button, Graphics& g, bool isM
     const TabbedButtonBar::Orientation o = button.getTabbedButtonBar().getOrientation();
     
     const Colour bkg (button.getTabBackgroundColour());
-    const Colour selcol = Colour::fromFloatRGBA(0.0f, 0.2f, 0.4f, 1.0f);
+    const Colour selcol = SlimUi::accentPurple();
 
     // DBG("Sono draw tab button");
     
@@ -579,7 +592,7 @@ void SonoLookAndFeel::drawTabButtonText (TabBarButton& button, Graphics& g, bool
     if (button.getTabbedButtonBar().isVertical())
         std::swap (length, depth);
     
-    Font font  = myFont.withHeight(jmin(depth,30.0f) * 0.6f * fontScale);
+    Font font  = SlimUi::displayRegular (jmin(depth,30.0f) * 0.6f * fontScale);
     font.setUnderline (button.hasKeyboardFocus (false));
     
     AffineTransform t;
@@ -638,12 +651,9 @@ static Range<float> getBrightnessRange (const Image& im)
 
 Font SonoLookAndFeel::getLabelFont (Label& label)
 {
-    if (fontScale == 1.0f) {
-        return label.getFont();
-    }
-    else {
-        return label.getFont().withHeight(label.getFont().getHeight() * fontScale);        
-    }
+    auto font = (fontScale == 1.0f) ? label.getFont()
+                                    : label.getFont().withHeight (label.getFont().getHeight() * fontScale);
+    return SlimUi::applyDisplayStyle (font);
 }
 
 void SonoLookAndFeel::drawLabel (Graphics& g, Label& label)
@@ -699,7 +709,7 @@ Font SonoLookAndFeel::getTextButtonFont (TextButton& button, int buttonHeight)
         textRatio = textbutt->getTextHeightRatio();
     }
     
-    return myFont.withHeight(jmin (16.0f, buttonHeight * textRatio) * fontScale);
+    return SlimUi::displayRegular (jmin (16.0f, buttonHeight * textRatio) * fontScale);
 }
 
 Button* SonoLookAndFeel::createSliderButton (Slider&, const bool isIncrement)
@@ -712,7 +722,7 @@ Label* SonoLookAndFeel::createSliderTextBox (Slider& slider)
 {
     Label * lab = LookAndFeel_V4::createSliderTextBox(slider);
     lab->setKeyboardType(TextInputTarget::decimalKeyboard);
-    lab->setFont(myFont.withHeight(14.0));
+    lab->setFont(SlimUi::displayRegular (14.0f));
     lab->setMinimumHorizontalScale(0.5);
     lab->setJustificationType(Justification::centredRight);
     return lab;
@@ -720,7 +730,7 @@ Label* SonoLookAndFeel::createSliderTextBox (Slider& slider)
 
 Font SonoLookAndFeel::getSliderPopupFont (Slider&)
 {
-    return Font (18.0f, Font::bold);
+    return SlimUi::displayBold (18.0f);
 }
 
 int SonoLookAndFeel::getSliderPopupPlacement (Slider&)
@@ -894,12 +904,12 @@ void SonoLookAndFeel::layoutFileBrowserComponent (FileBrowserComponent& browserC
 
 Font SonoLookAndFeel::getComboBoxFont (ComboBox& box)
 {
-    return { jmin (16.0f, (float) box.getHeight() * 0.9f) };
+    return SlimUi::displayRegular (jmin (16.0f, (float) box.getHeight() * 0.9f));
 }
 
 Font SonoLookAndFeel::getPopupMenuFont()
 {
-    return Font (17.0f * fontScale);
+    return SlimUi::displayRegular (17.0f * fontScale);
 }
 
 void SonoLookAndFeel::drawPopupMenuBackground (Graphics& g, [[maybe_unused]] int width, [[maybe_unused]] int height)
@@ -1300,7 +1310,7 @@ void SonoLookAndFeel::drawLinearSlider (Graphics& g, int x, int y, int width, in
 void SonoLookAndFeel::drawDrawableButton (Graphics& g, DrawableButton& button,
                                          bool isMouseOverButton, bool isButtonDown)
 {
-    const auto cornerSize = 6.0f;
+    const auto cornerSize = 8.0f;
     bool toggleState = button.getToggleState();
     
     ;
@@ -1769,4 +1779,174 @@ void SonoDashedBorderButtonLookAndFeel::drawButtonBackground(Graphics& g, Button
 
     g.setColour(button.findColour(ComboBox::outlineColourId));
     g.strokePath(strokePath, stroke);
+}
+
+MixerConsoleLookAndFeel::MixerConsoleLookAndFeel()
+{
+    setColour (Slider::backgroundColourId, Colour (0xff0C0D10));
+    setColour (Slider::trackColourId, SlimUi::accentBlue());
+    setColour (Slider::thumbColourId, Colour (0xffE8E9ED));
+    setColour (Slider::rotarySliderOutlineColourId, Colour (0xff2A2C32));
+    setColour (Slider::rotarySliderFillColourId, SlimUi::accentBlue());
+    setColour (Slider::textBoxTextColourId, SlimUi::text());
+    setColour (Slider::textBoxBackgroundColourId, Colours::transparentBlack);
+    setColour (Slider::textBoxOutlineColourId, Colours::transparentBlack);
+}
+
+int MixerConsoleLookAndFeel::getSliderThumbRadius (Slider& slider)
+{
+    if (slider.isVertical())
+        return 22;
+    if (slider.isRotary())
+        return 12;
+    return SonoLookAndFeel::getSliderThumbRadius (slider);
+}
+
+Slider::SliderLayout MixerConsoleLookAndFeel::getSliderLayout (Slider& slider)
+{
+    auto layout = SonoLookAndFeel::getSliderLayout (slider);
+    if (slider.isVertical() && slider.getTextBoxPosition() != Slider::NoTextBox)
+    {
+        layout.textBoxBounds = slider.getLocalBounds().removeFromTop (16).reduced (2, 0);
+        layout.sliderBounds = slider.getLocalBounds().withTrimmedTop (14).reduced (2, 4);
+    }
+    return layout;
+}
+
+Label* MixerConsoleLookAndFeel::createSliderTextBox (Slider& slider)
+{
+    auto* lab = LookAndFeel_V4::createSliderTextBox (slider);
+    lab->setKeyboardType (TextInputTarget::decimalKeyboard);
+    lab->setFont (SlimUi::displayBold (11.0f));
+    lab->setJustificationType (Justification::centred);
+    lab->setMinimumHorizontalScale (0.4f);
+    lab->setColour (Label::textColourId, SlimUi::text());
+    lab->setColour (Label::backgroundColourId, Colours::transparentBlack);
+    lab->setColour (Label::outlineColourId, Colours::transparentBlack);
+    lab->setColour (TextEditor::backgroundColourId, SlimUi::sidebar());
+    lab->setColour (TextEditor::outlineColourId, SlimUi::outline());
+    return lab;
+}
+
+Font MixerConsoleLookAndFeel::getLabelFont (Label& label)
+{
+    return SlimUi::displayBold (11.0f);
+}
+
+void MixerConsoleLookAndFeel::drawRotarySlider (Graphics& g, int x, int y, int width, int height, float sliderPos,
+                                                const float rotaryStartAngle, const float rotaryEndAngle, Slider& slider)
+{
+    auto bounds = Rectangle<int> (x, y, width, height).toFloat().reduced (3.0f);
+    const auto radius = jmin (bounds.getWidth(), bounds.getHeight()) * 0.5f;
+    const auto centre = bounds.getCentre();
+    const auto toAngle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
+
+    g.setColour (Colours::black.withAlpha (0.4f));
+    g.fillEllipse (centre.x - radius + 1.0f, centre.y - radius + 2.5f, radius * 2.0f, radius * 2.0f);
+
+    ColourGradient ring (Colour (0xff555861), centre.x, centre.y - radius,
+                         Colour (0xff1A1C21), centre.x, centre.y + radius, false);
+    g.setGradientFill (ring);
+    g.fillEllipse (centre.x - radius, centre.y - radius, radius * 2.0f, radius * 2.0f);
+
+    const auto inner = radius * 0.72f;
+    ColourGradient face (Colour (0xff3E424C), centre.x, centre.y - inner,
+                         Colour (0xff22242A), centre.x, centre.y + inner, false);
+    g.setGradientFill (face);
+    g.fillEllipse (centre.x - inner, centre.y - inner, inner * 2.0f, inner * 2.0f);
+
+    g.setColour (Colour (0x33ffffff));
+    g.drawEllipse (centre.x - inner, centre.y - inner, inner * 2.0f, inner * 2.0f, 1.0f);
+
+    Path valueArc;
+    const auto arcR = radius - 1.8f;
+    auto startAngle = rotaryStartAngle;
+    if (slider.getProperties().contains ("fromCentre"))
+        startAngle = (rotaryStartAngle + rotaryEndAngle) * 0.5f;
+
+    valueArc.addCentredArc (centre.x, centre.y, arcR, arcR, 0.0f, startAngle, toAngle, true);
+    g.setColour (slider.findColour (Slider::rotarySliderFillColourId));
+    g.strokePath (valueArc, PathStrokeType (2.6f, PathStrokeType::curved, PathStrokeType::rounded));
+
+    const auto pointerLen = radius * 0.52f;
+    const auto px = centre.x + pointerLen * std::cos (toAngle - MathConstants<float>::halfPi);
+    const auto py = centre.y + pointerLen * std::sin (toAngle - MathConstants<float>::halfPi);
+    g.setColour (Colour (0xffF2F3F5));
+    g.drawLine (centre.x, centre.y, px, py, 2.0f);
+    g.fillEllipse (centre.x - 2.4f, centre.y - 2.4f, 4.8f, 4.8f);
+}
+
+void MixerConsoleLookAndFeel::drawLinearSlider (Graphics& g, int x, int y, int width, int height,
+                                                float sliderPos, float minSliderPos, float maxSliderPos,
+                                                const Slider::SliderStyle style, Slider& slider)
+{
+    if (! slider.isVertical() || slider.isBar() || style == Slider::TwoValueVertical || style == Slider::ThreeValueVertical)
+    {
+        SonoLookAndFeel::drawLinearSlider (g, x, y, width, height, sliderPos, minSliderPos, maxSliderPos, style, slider);
+        return;
+    }
+
+    auto bounds = Rectangle<float> ((float) x, (float) y, (float) width, (float) height);
+    const float slotW = 7.0f;
+    auto slot = Rectangle<float> (bounds.getCentreX() - slotW * 0.5f, bounds.getY() + 8.0f,
+                                  slotW, jmax (8.0f, bounds.getHeight() - 16.0f));
+
+    Colour strip = slider.findColour (Slider::trackColourId);
+    if (slider.getProperties().contains ("stripColour"))
+        strip = Colour ((uint32) (int) slider.getProperties()["stripColour"]);
+
+    const float tickX = slot.getX() - 14.0f;
+    g.setFont (SlimUi::displayRegular (8.5f));
+    g.setColour (SlimUi::textDim().withAlpha (0.8f));
+    const float dbs[] = { 6.0f, 0.0f, -6.0f, -12.0f, -24.0f, -48.0f };
+    for (auto db : dbs)
+    {
+        const auto gain = Decibels::decibelsToGain (db);
+        const auto p = (float) slider.valueToProportionOfLength ((double) gain);
+        const float ty = slot.getY() + slot.getHeight() * (1.0f - p);
+        g.setColour (std::abs (db) < 0.01f ? Colour (0xffF2F3F5) : SlimUi::textDim().withAlpha (0.7f));
+        g.fillRect (slot.getX() - 5.0f, ty, 4.0f, 1.0f);
+        if (tickX > bounds.getX())
+            g.drawText (db > 0 ? "+" + String ((int) db) : String ((int) db),
+                        Rectangle<float> (bounds.getX(), ty - 6.0f, 16.0f, 12.0f),
+                        Justification::centredRight, false);
+    }
+
+    g.setColour (Colour (0xff07080A));
+    g.fillRoundedRectangle (slot, 3.5f);
+    g.setColour (Colour (0x66000000));
+    g.drawRoundedRectangle (slot, 3.5f, 1.0f);
+
+    const float fillTop = jlimit (slot.getY(), slot.getBottom(), sliderPos);
+    auto fill = Rectangle<float> (slot.getX(), fillTop, slot.getWidth(), slot.getBottom() - fillTop);
+    ColourGradient fillGrad (strip.brighter (0.15f), fill.getCentreX(), fill.getBottom(),
+                             strip.darker (0.25f), fill.getCentreX(), fill.getY(), false);
+    g.setGradientFill (fillGrad);
+    g.fillRoundedRectangle (fill, 3.0f);
+
+    const float capW = jmin (bounds.getWidth() * 0.72f, 32.0f);
+    const float capH = 42.0f;
+    auto cap = Rectangle<float> (bounds.getCentreX() - capW * 0.5f, sliderPos - capH * 0.5f, capW, capH);
+    cap = cap.constrainedWithin (bounds.reduced (1.0f, 1.0f));
+
+    g.setColour (Colours::black.withAlpha (0.5f));
+    g.fillRoundedRectangle (cap.translated (0.0f, 2.0f), 5.0f);
+
+    ColourGradient capGrad (Colour (0xff5A5E68), cap.getX(), cap.getY(),
+                            Colour (0xff2A2C32), cap.getX(), cap.getBottom(), false);
+    g.setGradientFill (capGrad);
+    g.fillRoundedRectangle (cap, 5.0f);
+
+    auto highlight = cap.removeFromTop (capH * 0.38f).reduced (1.2f, 0.0f);
+    g.setColour (Colour (0x33ffffff));
+    g.fillRoundedRectangle (highlight, 4.0f);
+
+    g.setColour (Colour (0xff1A1C21));
+    g.drawRoundedRectangle (Rectangle<float> (bounds.getCentreX() - capW * 0.5f, sliderPos - capH * 0.5f, capW, capH)
+                                .constrainedWithin (bounds.reduced (1.0f, 1.0f)), 5.0f, 1.0f);
+
+    g.setColour (strip);
+    g.fillRoundedRectangle (Rectangle<float> (bounds.getCentreX() - capW * 0.32f, sliderPos - 1.3f, capW * 0.64f, 2.6f), 1.2f);
+    g.setColour (Colour (0xffF2F3F5));
+    g.fillRoundedRectangle (Rectangle<float> (bounds.getCentreX() - capW * 0.18f, sliderPos - 0.7f, capW * 0.36f, 1.4f), 0.7f);
 }

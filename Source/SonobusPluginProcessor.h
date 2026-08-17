@@ -6,6 +6,7 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "SonobusFeatures.h"
 
 #include "aoo/aoo.hpp"
 #include "aoo/aoo_net.hpp"
@@ -13,16 +14,20 @@
 #include <map>
 #include <string>
 
+#if SONOBUS_FEATURE_REVERB
 #include "MVerb.h"
+#include "zitaRev.h"
+#endif
 
 #include "EffectParams.h"
 #include "ChannelGroup.h"
 
-#include "zitaRev.h"
-
 #include "SoundboardChannelProcessor.h"
+#include "RemoteMixTypes.h"
 
+#if SONOBUS_FEATURE_REVERB
 typedef MVerb<float> MVerbFloat;
+#endif
 
 namespace SonoAudio {
 class Metronome;
@@ -287,6 +292,7 @@ public:
     // server stuff
     void startAooServer();
     void stopAooServer();
+    bool isAooServerRunning() const { return (bool) mAooServer; }
     
     // client stuff
     
@@ -679,6 +685,10 @@ public:
         virtual void peerRequestedLatencyMatch(SonobusAudioProcessor *comp, const String & username, float latency) {}
         virtual void peerBlockedInfoChanged(SonobusAudioProcessor *comp, const String & username, bool blocked) {}
         virtual void peerSuggestedNewGroup(SonobusAudioProcessor *comp, const String & username, const String & newgroup, const String & grouppass, bool isPublic, const StringArray & others) {}
+        virtual void remoteMixStateReceived(SonobusAudioProcessor *comp, const String & fromUser, const Array<RemoteMix::SourceState> & sources) {}
+        virtual void remoteMixControlAck(SonobusAudioProcessor *comp, const String & targetUser, const String & sourceId, float gain, bool muted) {}
+        virtual void remoteMixControlFailed(SonobusAudioProcessor *comp, const String & targetUser, const String & sourceId, int reason) {}
+        virtual void remoteMixBeingControlled(SonobusAudioProcessor *comp, const String & fromUser) {}
     };
     
     void addClientListener(ClientListener * l) {
@@ -796,6 +806,27 @@ public:
     AudioTransportSource & getTransportSource() { return mTransportSource; }
     AudioFormatManager & getFormatManager() { return mFormatManager; }
 
+    // remote mix control
+    void sendRemoteMixControl(const StringArray & targets, const String & sourceId, float gain, bool muted, bool live);
+    void requestRemoteMixState(const String & targetUser);
+    void setAllowRemoteMixControl(bool flag);
+    bool getAllowRemoteMixControl() const { return mAllowRemoteMixControl.load(); }
+    String getRemoteMixControllerName() const;
+    bool isBeingRemoteMixControlled() const;
+    RemoteMix::MemberStatus getRemoteMixMemberStatus(const String & user) const;
+    Array<RemoteMix::SourceState> getLocalRemoteMixSnapshot() const;
+    Array<RemoteMix::SourceState> getAvailableRemoteMixSources() const;
+
+    int getRemoteMixControlGroupCount() const;
+    RemoteMix::ControlGroup getRemoteMixControlGroup(int index) const;
+    int getSelectedRemoteMixControlGroup() const { return mSelectedRemoteMixGroup; }
+    void setSelectedRemoteMixControlGroup(int index);
+    String addRemoteMixControlGroup(const String & name);
+    void removeRemoteMixControlGroup(const String & id);
+    void setRemoteMixControlGroupMembers(const String & id, const StringArray & members);
+    void setRemoteMixControlGroupSources(const String & id, const StringArray & sourceIds);
+    void ensureDefaultRemoteMixGroup();
+
     // chat
     bool sendChatEvent(const SBChatEvent & event);
     void setLastChatWidth(int width) { mLastChatWidth = width;}
@@ -876,6 +907,23 @@ private:
     void handlePingEvent(EndpointState * endpoint, uint64_t tt1, uint64_t tt2, uint64_t tt3);
 
     void sendPingEvent(RemotePeer * peer);
+
+    void processRemoteMixRetries();
+    void sendRemoteMixPacket(RemotePeer * peer, const MemoryBlock & packet);
+    MemoryBlock buildRemoteMixSetPacket(int seq, const String & sourceId, float gain, int flags, bool live);
+    MemoryBlock buildRemoteMixQueryPacket(int seq);
+    Array<MemoryBlock> buildRemoteMixStatePackets(int seq);
+    void queueReliableRemoteMix(RemotePeer * peer, int seq, RemoteMix::Kind kind, const String & sourceId, const MemoryBlock & packet);
+    void sendRemoteMixAck(EndpointState * endpoint, int seq);
+    void sendRemoteMixNack(EndpointState * endpoint, int seq, RemoteMix::NackReason reason);
+    bool applyRemoteMixSource(const String & sourceId, float gain, bool muted);
+    Array<RemoteMix::SourceState> buildLocalMixSnapshotLocked() const;
+    RemotePeer * findRemotePeerByUserName(const String & name);
+    const RemotePeer * findRemotePeerByUserName(const String & name) const;
+    int nextRemoteMixSeq();
+    void loadRemoteMixGroupsFromState(const ValueTree & extraTree);
+    void storeRemoteMixGroupsToState(ValueTree & extraTree);
+    void notifyRemoteMixBeingControlled(const String & fromUser);
 
     void updateSafetyMuting(RemotePeer * peer);
 
@@ -1060,8 +1108,8 @@ private:
     int mLastSoundboardWidth = 250;
     bool mLastSoundboardShown = false;
 
-    int mPluginWindowWidth = 800;
-    int mPluginWindowHeight = 600;
+    int mPluginWindowWidth = 1200;
+    int mPluginWindowHeight = 800;
 
 
     int mActiveSendChannels = 0;
@@ -1185,6 +1233,7 @@ private:
     int mInputChannelGroupCount = 0;
 
     // Effects
+#if SONOBUS_FEATURE_REVERB
     std::unique_ptr<Reverb> mMainReverb;
     Reverb::Parameters mMainReverbParams;
     MVerbFloat mMReverb;
@@ -1195,6 +1244,11 @@ private:
 
     // input reverb
     MVerbFloat mInputReverb;
+#else
+    std::unique_ptr<Reverb> mMainReverb;
+    Reverb::Parameters mMainReverbParams;
+    ReverbModel mLastReverbModel = ReverbModelMVerb;
+#endif
 
 
     // met and playback channel groups
@@ -1249,11 +1303,46 @@ private:
     std::unique_ptr<SoundboardChannelProcessor> soundboardChannelProcessor;
 
     // metronome
+#if SONOBUS_FEATURE_METRONOME
     std::unique_ptr<SonoAudio::Metronome> mMetronome;
+#endif
    
     // misc
     bool mSliderSnapToMouse = true;
     bool mDisableKeyboardShortcuts = false;
+    std::atomic<bool> mAllowRemoteMixControl { true };
+    int mSelectedRemoteMixGroup = 0;
+    int mRemoteMixNextSeq = 1;
+    String mRemoteMixControllerName;
+    uint32 mRemoteMixControlledAtMs = 0;
+    Array<RemoteMix::ControlGroup> mRemoteMixGroups;
+
+    struct RemoteMixPendingItem
+    {
+        int seq = 0;
+        String targetUser;
+        String sourceId;
+        RemoteMix::Kind kind = RemoteMix::Kind::Set;
+        MemoryBlock packet;
+        double nextRetryMs = 0;
+        int tries = 0;
+        int retryDelayMs = 40;
+        float gain = 1.0f;
+        bool muted = false;
+    };
+
+    struct RemoteMixPeerTx
+    {
+        Array<RemoteMixPendingItem> pending;
+        std::map<String, int> lastAppliedSeq;
+        std::map<String, int> lastLiveSeq;
+        RemoteMix::MemberStatus status = RemoteMix::MemberStatus::Ok;
+        uint32 lastFailMs = 0;
+    };
+
+    std::map<String, RemoteMixPeerTx> mRemoteMixTx;
+    std::map<String, String> mRemoteMixChunks;
+    mutable CriticalSection mRemoteMixLock;
     VideoLinkInfo mVideoLinkInfo;
     
     File mSupportDir;

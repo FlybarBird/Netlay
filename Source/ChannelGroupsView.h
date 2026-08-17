@@ -5,27 +5,40 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "SonobusFeatures.h"
 
 #include "SonobusPluginProcessor.h"
 #include "SonoLookAndFeel.h"
 #include "SonoChoiceButton.h"
 #include "SonoDrawableButton.h"
 #include "GenericItemChooser.h"
+#if SONOBUS_FEATURE_FX
 #include "CompressorView.h"
 #include "ExpanderView.h"
 #include "ParametricEqView.h"
 #include "MonitorDelayView.h"
-#include "ReverbSendView.h"
 #include "PolarityInvertView.h"
+#endif
+#if SONOBUS_FEATURE_REVERB
+#include "ReverbSendView.h"
 #include "ReverbView.h"
+#endif
+#if (SONOBUS_FEATURE_FX || SONOBUS_FEATURE_REVERB)
+#include "EffectsBaseView.h"
+#endif
 
+#if SONOBUS_FEATURE_FX || SONOBUS_FEATURE_REVERB
 class ChannelGroupEffectsView :
 public Component,
+#if SONOBUS_FEATURE_FX
 public CompressorView::Listener,
 public ExpanderView::Listener,
 public ParametricEqView::Listener,
-public ReverbSendView::Listener,
 public PolarityInvertView::Listener,
+#endif
+#if SONOBUS_FEATURE_REVERB
+public ReverbSendView::Listener,
+#endif
 public EffectsBaseView::HeaderListener
 {
 public:
@@ -56,14 +69,18 @@ public:
     void resized() override;
 
 
+#if SONOBUS_FEATURE_FX
     void compressorParamsChanged(CompressorView *comp, SonoAudio::CompressorParams & params) override;
 
     void expanderParamsChanged(ExpanderView *comp, SonoAudio::CompressorParams & params) override;
     void parametricEqParamsChanged(ParametricEqView *comp, SonoAudio::ParametricEqParams & params) override;
 
-    void reverbSendLevelChanged(ReverbSendView *comp, float revlevel) override;
-
     void polarityInvertChanged(PolarityInvertView *comp, bool polinv) override;
+#endif
+
+#if SONOBUS_FEATURE_REVERB
+    void reverbSendLevelChanged(ReverbSendView *comp, float revlevel) override;
+#endif
 
     void effectsHeaderClicked(EffectsBaseView *comp) override;
 
@@ -81,6 +98,7 @@ protected:
 
     std::unique_ptr<ConcertinaPanel> effectsConcertina;
 
+#if SONOBUS_FEATURE_FX
     std::unique_ptr<CompressorView> compressorView;
 
 
@@ -88,9 +106,12 @@ protected:
 
     std::unique_ptr<ParametricEqView> eqView;
 
-    std::unique_ptr<ReverbSendView> reverbSendView;
-
     std::unique_ptr<PolarityInvertView> polarityInvertView;
+#endif
+
+#if SONOBUS_FEATURE_REVERB
+    std::unique_ptr<ReverbSendView> reverbSendView;
+#endif
 
     FlexBox effectsBox;
 
@@ -99,12 +120,17 @@ protected:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelGroupEffectsView)
 
 };
+#endif
 
+#if SONOBUS_FEATURE_FX || SONOBUS_FEATURE_REVERB
 class ChannelGroupMonitorEffectsView :
 public Component,
-public ParametricEqView::Listener,
+#if SONOBUS_FEATURE_FX
 public MonitorDelayView::Listener,
+#endif
+#if SONOBUS_FEATURE_REVERB
 public ReverbSendView::Listener,
+#endif
 public EffectsBaseView::HeaderListener
 {
 public:
@@ -137,9 +163,13 @@ public:
 
     void resized() override;
 
+#if SONOBUS_FEATURE_FX
     void monitorDelayParamsChanged(MonitorDelayView *comp, SonoAudio::DelayParams &params) override;
+#endif
 
+#if SONOBUS_FEATURE_REVERB
     void reverbSendLevelChanged(ReverbSendView *comp, float revlevel) override;
+#endif
 
     void effectsHeaderClicked(EffectsBaseView *comp) override;
 
@@ -157,9 +187,13 @@ protected:
 
     std::unique_ptr<ConcertinaPanel> effectsConcertina;
 
+#if SONOBUS_FEATURE_FX
     std::unique_ptr<MonitorDelayView> delayView;
+#endif
 
+#if SONOBUS_FEATURE_REVERB
     std::unique_ptr<ReverbSendView> reverbSendView;
+#endif
 
 
     FlexBox effectsBox;
@@ -169,7 +203,9 @@ protected:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelGroupMonitorEffectsView)
 
 };
+#endif
 
+#if SONOBUS_FEATURE_REVERB
 class ChannelGroupReverbEffectsView :
 public Component,
 public ReverbView::Listener,
@@ -223,6 +259,7 @@ protected:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelGroupReverbEffectsView)
 
 };
+#endif
 
 
 class ChannelGroupView : public Component {
@@ -240,6 +277,8 @@ public:
     int groupChanCount = 0;
 
     bool showDivider = false;
+    bool consoleMode = false;
+    Colour stripColor { 0xff3581D6 };
 
     SonoBigTextLookAndFeel smallLnf;
     SonoBigTextLookAndFeel medLnf;
@@ -298,8 +337,10 @@ public Button::Listener,
 public Slider::Listener,
 public SonoChoiceButton::Listener,
 public GenericItemChooser::Listener,
+#if SONOBUS_FEATURE_FX || SONOBUS_FEATURE_REVERB
 public ChannelGroupEffectsView::Listener,
 public ChannelGroupMonitorEffectsView::Listener,
+#endif
 public MultiTimer
 {
 public:
@@ -326,14 +367,17 @@ public:
     void setPeerMode(bool peermode, int index=0);
     bool getPeerMode() const { return mPeerMode; }
     int getPeerIndex() const { return mPeerIndex; }
+    void addGroupPressed();
 
     void buttonClicked (Button* buttonThatWasClicked) override;        
     void sliderValueChanged (Slider* slider) override;
     void choiceButtonSelected(SonoChoiceButton *comp, int index, int ident) override;
 
+#if SONOBUS_FEATURE_FX || SONOBUS_FEATURE_REVERB
     void effectsEnableChanged(ChannelGroupEffectsView *comp) override;
 
     void monitorEffectsEnableChanged(ChannelGroupMonitorEffectsView *comp) override;
+#endif
 
 
     void mouseUp (const MouseEvent& event)  override;
@@ -367,6 +411,8 @@ public:
 
     void setEstimatedWidth(int estwidth) { mEstimatedWidth = estwidth; }
     int getEstimatedWidth() const { return mEstimatedWidth;}
+    void setEstimatedHeight(int estheight) { mEstimatedHeight = estheight; }
+    int getEstimatedHeight() const { return mEstimatedHeight;}
 
     juce::Rectangle<int> getMinimumContentBounds() const;
 
@@ -397,7 +443,6 @@ protected:
     void inputButtonPressed(Component *src, int index, bool newlinkstate);
     void peerChanButtonPressed(Component *src, int index, bool newlinkstate);
 
-    void addGroupPressed();
     void clearGroupsPressed();
     void showChangeGroupChannels(int changroup, Component * showfrom);
     void showChangePeerChannelsLayout(int changroup, Component * showfrom);
@@ -416,6 +461,7 @@ protected:
     int getChanGroupForPoint(Point<int> pos, bool inbetween);
 
     SonoBigTextLookAndFeel addLnf;
+    MixerConsoleLookAndFeel mixerConsoleLNF;
 
     SonobusAudioProcessor& processor;
 
@@ -429,9 +475,13 @@ protected:
     std::unique_ptr<ChannelGroupView> mSoundboardChannelView; // used for init
 
 
+#if SONOBUS_FEATURE_FX || SONOBUS_FEATURE_REVERB
     std::unique_ptr<ChannelGroupEffectsView> mEffectsView;
     std::unique_ptr<ChannelGroupMonitorEffectsView> mMonEffectsView;
+#endif
+#if SONOBUS_FEATURE_REVERB
     std::unique_ptr<ChannelGroupReverbEffectsView> mInputReverbView;
+#endif
 
 
 
@@ -463,6 +513,7 @@ protected:
     int channelMinHeight = 60;
     int channelMinWidth = 400;
     int mEstimatedWidth = 0;
+    int mEstimatedHeight = 0;
 
     bool isNarrow = false;
     bool metersActive = false;

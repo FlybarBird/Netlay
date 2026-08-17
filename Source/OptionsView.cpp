@@ -2,6 +2,7 @@
 // Copyright (C) 2021 Jesse Chappell
 
 #include "OptionsView.h"
+#include "SlimUi.h"
 
 #if JUCE_ANDROID
 #include "juce_core/native/juce_BasicNativeHeaders.h"
@@ -38,10 +39,10 @@ enum {
 
 void OptionsView::initializeLanguages()
 {
-    // TODO smarter way of figuring out what languages are available
     languages.add(TRANS("System Default Language")); languagesNative.add(""); codes.add("");
 
     languages.add(TRANS("English")); languagesNative.add("English"); codes.add("en");
+#if SONOBUS_FEATURE_I18N
     languages.add(TRANS("Spanish")); languagesNative.add(CharPointer_UTF8 ("espa\xc3\xb1ol")); codes.add("es");
     languages.add(TRANS("French"));  languagesNative.add(CharPointer_UTF8 ("fran\xc3\xa7""ais")); codes.add("fr");
     languages.add(TRANS("Italian"));  languagesNative.add("italiano"); codes.add("it");
@@ -71,6 +72,7 @@ void OptionsView::initializeLanguages()
     //languages.add(TRANS("Chinese (Traditional)")); languagesNative.add(CharPointer_UTF8 ("\xe4\xb8\xad\xe6\x96\x87\xef\xbc\x88\xe7\xb9\x81\xe9\xab\x94\xef\xbc\x89")); codes.add("zh-hant");
 
     languages.add(TRANS("Russian"));  languagesNative.add(juce::CharPointer_UTF8 ("p\xd1\x83\xd1\x81\xd1\x81\xd0\xba\xd0\xb8\xd0\xb9")); codes.add("ru");
+#endif
 
 
     // TODO - parse any user files with localized_%s.txt in our settings folder and add as options if not existing already
@@ -90,7 +92,9 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
 
     initializeLanguages();
 
+#if SONOBUS_FEATURE_RECORD
     mRecOptionsComponent = std::make_unique<Component>();
+#endif
     mOptionsComponent = std::make_unique<Component>();
 
     mSettingsTab = std::make_unique<TabbedComponent>(TabbedButtonBar::Orientation::TabsAtTop);
@@ -152,6 +156,7 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
     mOptionsFormatChoiceStaticLabel->setJustificationType(Justification::centredRight);
 
 
+#if SONOBUS_FEATURE_I18N
     mOptionsLanguageChoice = std::make_unique<SonoChoiceButton>();
     mOptionsLanguageChoice->setTitle(TRANS("Language"));
     mOptionsLanguageChoice->addChoiceListener(this);
@@ -184,12 +189,14 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
     mOptionsUnivFontButton->setTooltip(TRANS("Use font that always supports Chinese, Japanese, and Korean characters. Can cause slowdowns on some systems, so only use it if you need it."));
     mOptionsUnivFontButton->setToggleState(processor.getUseUniversalFont(), dontSendNotification);
     mOptionsUnivFontButton->addListener(this);
+#endif
 
 
     //mOptionsHearLatencyButton = std::make_unique<ToggleButton>(TRANS("Make Latency Test Audible"));
     //mOptionsHearLatencyButton->addListener(this);
     //mHearLatencyTestAttachment = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment> (p.getValueTreeState(), SonobusAudioProcessor::paramHearLatencyTest, *mOptionsHearLatencyButton);
 
+#if SONOBUS_FEATURE_RECORD
     mOptionsMetRecordedButton = std::make_unique<ToggleButton>(TRANS("Metronome output recorded in full mix"));
     mOptionsMetRecordedButton->addListener(this);
     mMetRecordedAttachment = std::make_unique<AudioProcessorValueTreeState::ButtonAttachment> (processor.getValueTreeState(), SonobusAudioProcessor::paramMetIsRecorded, *mOptionsMetRecordedButton);
@@ -246,6 +253,7 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
     mRecLocationButton->setButtonText("");
     mRecLocationButton->setLookAndFeel(&smallLNF);
     mRecLocationButton->addListener(this);
+#endif
 
 
 
@@ -262,11 +270,16 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
     mOptionsOverrideSamplerateButton = std::make_unique<ToggleButton>(TRANS("Override Device Sample Rate"));
     mOptionsOverrideSamplerateButton->addListener(this);
 
+#if SONOBUS_FEATURE_UPDATER
     mOptionsShouldCheckForUpdateButton = std::make_unique<ToggleButton>(TRANS("Automatically check for updates"));
     mOptionsShouldCheckForUpdateButton->addListener(this);
+#endif
 
     mOptionsSliderSnapToMouseButton = std::make_unique<ToggleButton>(TRANS("Sliders Snap to Clicked Position"));
     mOptionsSliderSnapToMouseButton->addListener(this);
+
+    mOptionsAllowRemoteMixButton = std::make_unique<ToggleButton>(TRANS("Allow others to control my mix"));
+    mOptionsAllowRemoteMixButton->addListener(this);
 
     mOptionsDisableShortcutButton = std::make_unique<ToggleButton>(TRANS("Disable keyboard shortcuts"));
     mOptionsDisableShortcutButton->addListener(this);
@@ -277,9 +290,6 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
         mOptionsAllowBluetoothInput->addListener(this);
     }
 #endif
-
-    mOptionsInputLimiterButton = std::make_unique<ToggleButton>(TRANS("Use Input FX Limiter"));
-    mOptionsInputLimiterButton->addListener(this);
 
     mOptionsChangeAllFormatButton = std::make_unique<ToggleButton>(TRANS("Change all connected"));
     mOptionsChangeAllFormatButton->addListener(this);
@@ -354,9 +364,13 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
 
     
 
-    mVersionLabel = std::make_unique<Label>("", TRANS("Version: ") + ProjectInfo::versionString);
+    mVersionLabel = std::make_unique<Label>("", TRANS("Netlay  ") + TRANS("Version: ") + ProjectInfo::versionString);
     configLabel(mVersionLabel.get(), true);
     mVersionLabel->setJustificationType(Justification::centredRight);
+
+    mCreditLabel = std::make_unique<Label>("", TRANS("Based on SonoBus"));
+    configLabel(mCreditLabel.get(), true);
+    mCreditLabel->setJustificationType(Justification::centredRight);
 
     addAndMakeVisible(mSettingsTab.get());
 
@@ -370,14 +384,16 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
     mOptionsComponent->addAndMakeVisible(mOptionsUseSpecificUdpPortButton.get());
     mOptionsComponent->addAndMakeVisible(mOptionsDynamicResamplingButton.get());
     mOptionsComponent->addAndMakeVisible(mOptionsAutoReconnectButton.get());
-    mOptionsComponent->addAndMakeVisible(mOptionsInputLimiterButton.get());
     mOptionsComponent->addAndMakeVisible(mOptionsDefaultLevelSlider.get());
     mOptionsComponent->addAndMakeVisible(mOptionsDefaultLevelSliderLabel.get());
     mOptionsComponent->addAndMakeVisible(mOptionsChangeAllFormatButton.get());
     mOptionsComponent->addAndMakeVisible(mVersionLabel.get());
+    mOptionsComponent->addAndMakeVisible(mCreditLabel.get());
+#if SONOBUS_FEATURE_I18N
     mOptionsComponent->addAndMakeVisible(mOptionsLanguageChoice.get());
     mOptionsComponent->addAndMakeVisible(mOptionsUnivFontButton.get());
     mOptionsComponent->addAndMakeVisible(mOptionsLanguageLabel.get());
+#endif
     mOptionsComponent->addAndMakeVisible(mOptionsAutoDropThreshSlider.get());
     mOptionsComponent->addAndMakeVisible(mOptionsAutoDropThreshLabel.get());
 
@@ -390,16 +406,20 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
 
     if (JUCEApplicationBase::isStandaloneApp()) {
         mOptionsComponent->addAndMakeVisible(mOptionsOverrideSamplerateButton.get());
+#if SONOBUS_FEATURE_UPDATER
         mOptionsComponent->addAndMakeVisible(mOptionsShouldCheckForUpdateButton.get());
+#endif
         if (mOptionsAllowBluetoothInput) {
             mOptionsComponent->addAndMakeVisible(mOptionsAllowBluetoothInput.get());
         }
     }
     mOptionsComponent->addAndMakeVisible(mOptionsSliderSnapToMouseButton.get());
+    mOptionsComponent->addAndMakeVisible(mOptionsAllowRemoteMixButton.get());
     mOptionsComponent->addAndMakeVisible(mOptionsDisableShortcutButton.get());
 
 
 
+#if SONOBUS_FEATURE_RECORD
     mRecOptionsComponent->addAndMakeVisible(mOptionsMetRecordedButton.get());
     mRecOptionsComponent->addAndMakeVisible(mOptionsRecFinishOpenButton.get());
     mRecOptionsComponent->addAndMakeVisible(mOptionsRecFilesStaticLabel.get());
@@ -414,6 +434,7 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
     mRecOptionsComponent->addAndMakeVisible(mRecFormatStaticLabel.get());
     mRecOptionsComponent->addAndMakeVisible(mRecLocationButton.get());
     mRecOptionsComponent->addAndMakeVisible(mRecLocationStaticLabel.get());
+#endif
 
 
     if (JUCEApplicationBase::isStandaloneApp() && getAudioDeviceManager && getAudioDeviceManager())
@@ -485,7 +506,7 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
         }
 
         if (firsttime) {
-            mSettingsTab->addTab(TRANS("AUDIO"), Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0), mAudioOptionsViewport.get(), false);
+            mSettingsTab->addTab(TRANS("AUDIO"), SlimUi::card(), mAudioOptionsViewport.get(), false);
         }
 
     }
@@ -493,13 +514,15 @@ OptionsView::OptionsView(SonobusAudioProcessor& proc, std::function<AudioDeviceM
     mOtherOptionsViewport = std::make_unique<Viewport>();
     mOtherOptionsViewport->setViewedComponent(mOptionsComponent.get(), false);
 
-    mSettingsTab->addTab(TRANS("OPTIONS"),Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0), mOtherOptionsViewport.get(), false);
+    mSettingsTab->addTab(TRANS("OPTIONS"), SlimUi::card(), mOtherOptionsViewport.get(), false);
    // mSettingsTab->addTab(TRANS("HELP"), Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0), mHelpComponent.get(), false);
 
+#if SONOBUS_FEATURE_RECORD
     mRecordOptionsViewport = std::make_unique<Viewport>();
     mRecordOptionsViewport->setViewedComponent(mRecOptionsComponent.get(), false);
 
     mSettingsTab->addTab(TRANS("RECORDING"),Colour::fromFloatRGBA(0.1, 0.1, 0.1, 1.0), mRecordOptionsViewport.get(), false);
+#endif
 
     setFocusContainerType(FocusContainerType::keyboardFocusContainer);
 
@@ -626,7 +649,10 @@ void OptionsView::updateState(bool ignorecheck)
         }
         if (getShouldCheckForNewVersionValue) {
             Value * val = getShouldCheckForNewVersionValue();
-            mOptionsShouldCheckForUpdateButton->setToggleState((bool)val->getValue(), dontSendNotification);
+#if SONOBUS_FEATURE_UPDATER
+            if (mOptionsShouldCheckForUpdateButton)
+                mOptionsShouldCheckForUpdateButton->setToggleState((bool)val->getValue(), dontSendNotification);
+#endif
         }
 
         if (getAllowBluetoothInputValue && mOptionsAllowBluetoothInput) {
@@ -636,13 +662,18 @@ void OptionsView::updateState(bool ignorecheck)
 
     }
 
-    mOptionsUnivFontButton->setToggleState(processor.getUseUniversalFont(), dontSendNotification);
+#if SONOBUS_FEATURE_I18N
+    if (mOptionsUnivFontButton)
+        mOptionsUnivFontButton->setToggleState(processor.getUseUniversalFont(), dontSendNotification);
+#endif
 
     mOptionsSliderSnapToMouseButton->setToggleState(processor.getSlidersSnapToMousePosition(), dontSendNotification);
+    mOptionsAllowRemoteMixButton->setToggleState(processor.getAllowRemoteMixControl(), dontSendNotification);
     mOptionsDisableShortcutButton->setToggleState(processor.getDisableKeyboardShortcuts(), dontSendNotification);
 
     uint32 recmask = processor.getDefaultRecordingOptions();
 
+#if SONOBUS_FEATURE_RECORD
     mOptionsRecOthersButton->setToggleState((recmask & SonobusAudioProcessor::RecordIndividualUsers) != 0, dontSendNotification);
     mOptionsRecMixButton->setToggleState((recmask & SonobusAudioProcessor::RecordMix) != 0, dontSendNotification);
     mOptionsRecMixMinusButton->setToggleState((recmask & SonobusAudioProcessor::RecordMixMinusSelf) != 0, dontSendNotification);
@@ -664,10 +695,7 @@ void OptionsView::updateState(bool ignorecheck)
         if (dispath.startsWith(".")) dispath = recdir.getFullPathName();
     }
     mRecLocationButton->setButtonText(dispath);
-
-    CompressorParams limparams;
-    processor.getInputLimiterParams(0, limparams);
-    mOptionsInputLimiterButton->setToggleState(limparams.enabled, dontSendNotification);
+#endif
 
     if (getShouldOverrideSampleRateValue) {
         Value * val = getShouldOverrideSampleRateValue();
@@ -675,7 +703,10 @@ void OptionsView::updateState(bool ignorecheck)
     }
     if (getShouldCheckForNewVersionValue) {
         Value * val = getShouldCheckForNewVersionValue();
-        mOptionsShouldCheckForUpdateButton->setToggleState((bool)val->getValue(), dontSendNotification);
+#if SONOBUS_FEATURE_UPDATER
+        if (mOptionsShouldCheckForUpdateButton)
+            mOptionsShouldCheckForUpdateButton->setToggleState((bool)val->getValue(), dontSendNotification);
+#endif
     }
     if (mOptionsAllowBluetoothInput && getAllowBluetoothInputValue) {
         Value * val = getAllowBluetoothInputValue();
@@ -727,9 +758,11 @@ void OptionsView::updateLayout()
 
     optionsLanguageBox.items.clear();
     optionsLanguageBox.flexDirection = FlexBox::Direction::row;
+#if SONOBUS_FEATURE_I18N
     optionsLanguageBox.items.add(FlexItem(minButtonWidth-10, minitemheight, *mOptionsLanguageLabel).withMargin(0).withFlex(0.5f));
     optionsLanguageBox.items.add(FlexItem(minButtonWidth, minitemheight, *mOptionsLanguageChoice).withMargin(0).withFlex(3));
     optionsLanguageBox.items.add(FlexItem(minButtonWidth-10, minitemheight, *mOptionsUnivFontButton).withMargin(0).withFlex(1.0));
+#endif
 
     //optionsHearlatBox.items.clear();
     //optionsHearlatBox.flexDirection = FlexBox::Direction::row;
@@ -770,11 +803,6 @@ void OptionsView::updateLayout()
     optionsOverrideSamplerateBox.items.add(FlexItem(10, 12).withFlex(0));
     optionsOverrideSamplerateBox.items.add(FlexItem(180, minpassheight, *mOptionsOverrideSamplerateButton).withMargin(0).withFlex(1));
 
-    optionsInputLimitBox.items.clear();
-    optionsInputLimitBox.flexDirection = FlexBox::Direction::row;
-    optionsInputLimitBox.items.add(FlexItem(10, 12).withFlex(0));
-    optionsInputLimitBox.items.add(FlexItem(180, minpassheight, *mOptionsInputLimiterButton).withMargin(0).withFlex(1));
-
     optionsChangeAllQualBox.items.clear();
     optionsChangeAllQualBox.flexDirection = FlexBox::Direction::row;
     optionsChangeAllQualBox.items.add(FlexItem(10, 12).withFlex(1));
@@ -782,13 +810,20 @@ void OptionsView::updateLayout()
 
     optionsCheckForUpdateBox.items.clear();
     optionsCheckForUpdateBox.flexDirection = FlexBox::Direction::row;
+#if SONOBUS_FEATURE_UPDATER
     optionsCheckForUpdateBox.items.add(FlexItem(10, 12).withFlex(0));
     optionsCheckForUpdateBox.items.add(FlexItem(180, minpassheight, *mOptionsShouldCheckForUpdateButton).withMargin(0).withFlex(1));
+#endif
 
     optionsSnapToMouseBox.items.clear();
     optionsSnapToMouseBox.flexDirection = FlexBox::Direction::row;
     optionsSnapToMouseBox.items.add(FlexItem(10, 12).withFlex(0));
     optionsSnapToMouseBox.items.add(FlexItem(180, minpassheight, *mOptionsSliderSnapToMouseButton).withMargin(0).withFlex(1));
+
+    optionsAllowRemoteMixBox.items.clear();
+    optionsAllowRemoteMixBox.flexDirection = FlexBox::Direction::row;
+    optionsAllowRemoteMixBox.items.add(FlexItem(10, 12).withFlex(0));
+    optionsAllowRemoteMixBox.items.add(FlexItem(180, minpassheight, *mOptionsAllowRemoteMixButton).withMargin(0).withFlex(1));
 
     optionsDisableShortcutsBox.items.clear();
     optionsDisableShortcutsBox.flexDirection = FlexBox::Direction::row;
@@ -815,9 +850,12 @@ void OptionsView::updateLayout()
     optionsBox.flexDirection = FlexBox::Direction::column;
     optionsBox.items.add(FlexItem(4, 6));
     optionsBox.items.add(FlexItem(100, 15, *mVersionLabel).withMargin(2).withFlex(0));
+    optionsBox.items.add(FlexItem(100, 15, *mCreditLabel).withMargin(2).withFlex(0));
     optionsBox.items.add(FlexItem(4, 4));
+#if SONOBUS_FEATURE_I18N
     optionsBox.items.add(FlexItem(100, minitemheight, optionsLanguageBox).withMargin(2).withFlex(0));
     optionsBox.items.add(FlexItem(4, 4));
+#endif
     optionsBox.items.add(FlexItem(100, minitemheight, optionsSendQualBox).withMargin(2).withFlex(0));
     optionsBox.items.add(FlexItem(100, minitemheight - 10, optionsChangeAllQualBox).withMargin(1).withFlex(0));
     optionsBox.items.add(FlexItem(4, 4));
@@ -827,9 +865,8 @@ void OptionsView::updateLayout()
     optionsBox.items.add(FlexItem(4, 10));
     optionsBox.items.add(FlexItem(100, minitemheight, optionsDefaultLevelBox).withMargin(2).withFlex(0));
     optionsBox.items.add(FlexItem(4, 6));
-    optionsBox.items.add(FlexItem(100, minpassheight, optionsInputLimitBox).withMargin(2).withFlex(0));
-    //optionsBox.items.add(FlexItem(100, minpassheight, optionsHearlatBox).withMargin(2).withFlex(0));
     optionsBox.items.add(FlexItem(100, minpassheight, optionsSnapToMouseBox).withMargin(2).withFlex(0));
+    optionsBox.items.add(FlexItem(100, minpassheight, optionsAllowRemoteMixBox).withMargin(2).withFlex(0));
     optionsBox.items.add(FlexItem(100, minpassheight, optionsAutoReconnectBox).withMargin(2).withFlex(0));
     optionsBox.items.add(FlexItem(100, minitemheight, optionsUdpBox).withMargin(2).withFlex(0));
     if (JUCEApplicationBase::isStandaloneApp()) {
@@ -837,7 +874,9 @@ void OptionsView::updateLayout()
         if (mOptionsAllowBluetoothInput) {
             optionsBox.items.add(FlexItem(100, minpassheight, optionsAllowBluetoothBox).withMargin(2).withFlex(0));
         }
+#if SONOBUS_FEATURE_UPDATER
         optionsBox.items.add(FlexItem(100, minpassheight, optionsCheckForUpdateBox).withMargin(2).withFlex(0));
+#endif
     }
     optionsBox.items.add(FlexItem(100, minpassheight, optionsDisableShortcutsBox).withMargin(2).withFlex(0));
     optionsBox.items.add(FlexItem(100, minpassheight, optionsDynResampleBox).withMargin(2).withFlex(0));
@@ -853,6 +892,7 @@ void OptionsView::updateLayout()
 
     // record options
 
+#if SONOBUS_FEATURE_RECORD
     optionsMetRecordBox.items.clear();
     optionsMetRecordBox.flexDirection = FlexBox::Direction::row;
     optionsMetRecordBox.items.add(FlexItem(10, 12));
@@ -932,6 +972,7 @@ void OptionsView::updateLayout()
     for (auto & item : recOptionsBox.items) {
         minRecOptionsHeight += item.minHeight + item.margin.top + item.margin.bottom;
     }
+#endif
 
 
     mainBox.items.clear();
@@ -951,12 +992,18 @@ void OptionsView::resized()  {
         mAudioDeviceSelector->setBounds(Rectangle<int>(0,0,innerbounds.getWidth() - 10,mAudioDeviceSelector->getHeight()));
     }
     mOptionsComponent->setBounds(Rectangle<int>(0,0,innerbounds.getWidth() - 10, minOptionsHeight));
-    mRecOptionsComponent->setBounds(Rectangle<int>(0,0,innerbounds.getWidth() - 10, minRecOptionsHeight));
+#if SONOBUS_FEATURE_RECORD
+    if (mRecOptionsComponent)
+        mRecOptionsComponent->setBounds(Rectangle<int>(0,0,innerbounds.getWidth() - 10, minRecOptionsHeight));
+#endif
 
 
 
     optionsBox.performLayout(mOptionsComponent->getLocalBounds());
-    recOptionsBox.performLayout(mRecOptionsComponent->getLocalBounds());
+#if SONOBUS_FEATURE_RECORD
+    if (mRecOptionsComponent)
+        recOptionsBox.performLayout(mRecOptionsComponent->getLocalBounds());
+#endif
 
     mOptionsAutosizeStaticLabel->setBounds(mBufferTimeSlider->getBounds().removeFromLeft(mBufferTimeSlider->getWidth()*0.75));
 
@@ -971,19 +1018,23 @@ void OptionsView::resized()  {
 
 void OptionsView::showAudioTab()
 {
-    if (mSettingsTab->getNumTabs() == 3) {
+    if (mAudioOptionsViewport) {
         mSettingsTab->setCurrentTabIndex(0);
     }
 }
 
 void OptionsView::showOptionsTab()
 {
-    mSettingsTab->setCurrentTabIndex(mSettingsTab->getNumTabs() == 3 ? 1 : 0);
+    mSettingsTab->setCurrentTabIndex(mAudioOptionsViewport ? 1 : 0);
 }
 
 void OptionsView::showRecordingTab()
 {
-    mSettingsTab->setCurrentTabIndex(mSettingsTab->getNumTabs() == 3 ? 2 : 1);
+#if SONOBUS_FEATURE_RECORD
+    int idx = mAudioOptionsViewport ? 2 : 1;
+    if (mSettingsTab->getNumTabs() > idx)
+        mSettingsTab->setCurrentTabIndex(idx);
+#endif
 }
 
 
@@ -1051,6 +1102,7 @@ void OptionsView::changeUdpPort(int port)
 
 void OptionsView::buttonClicked (Button* buttonThatWasClicked)
 {
+#if SONOBUS_FEATURE_RECORD
     if (buttonThatWasClicked == mRecLocationButton.get()) {
         // browse folder chooser
         SafePointer<OptionsView> safeThis (this);
@@ -1073,14 +1125,11 @@ void OptionsView::buttonClicked (Button* buttonThatWasClicked)
          
         chooseRecDirBrowser();
     }
-    else if (buttonThatWasClicked == mOptionsInputLimiterButton.get()) {
-        CompressorParams params;
-        for (int j=0; j < processor.getInputGroupCount(); ++j) {
-            processor.getInputLimiterParams(j, params);
-            params.enabled = mOptionsInputLimiterButton->getToggleState();
-            processor.setInputLimiterParams(j, params);
-        }
+    else
+#endif
+    if (false) {
     }
+#if SONOBUS_FEATURE_RECORD
     else if (buttonThatWasClicked == mOptionsRecMixButton.get()
              || buttonThatWasClicked == mOptionsRecSelfButton.get()
              || buttonThatWasClicked == mOptionsRecOthersButton.get()
@@ -1100,9 +1149,11 @@ void OptionsView::buttonClicked (Button* buttonThatWasClicked)
 
         processor.setDefaultRecordingOptions(recmask);
     }
+#endif
     else if (buttonThatWasClicked == mOptionsChangeAllFormatButton.get()) {
         processor.setChangingDefaultAudioCodecSetsExisting(mOptionsChangeAllFormatButton->getToggleState());
     }
+#if SONOBUS_FEATURE_RECORD
     else if (buttonThatWasClicked == mOptionsRecSelfPostFxButton.get()) {
         processor.setSelfRecordingPreFX(!mOptionsRecSelfPostFxButton->getToggleState());
     }
@@ -1112,6 +1163,7 @@ void OptionsView::buttonClicked (Button* buttonThatWasClicked)
     else if (buttonThatWasClicked == mOptionsRecFinishOpenButton.get()) {
         processor.setRecordFinishOpens(mOptionsRecFinishOpenButton->getToggleState());
     }
+#endif
     else if (buttonThatWasClicked == mOptionsUseSpecificUdpPortButton.get()) {
         if (!mOptionsUseSpecificUdpPortButton->getToggleState()) {
             // toggled off, change back to use system chosen port
@@ -1140,6 +1192,7 @@ void OptionsView::buttonClicked (Button* buttonThatWasClicked)
 #endif
         }
     }
+#if SONOBUS_FEATURE_UPDATER
     else if (buttonThatWasClicked == mOptionsShouldCheckForUpdateButton.get()) {
 
         if (JUCEApplicationBase::isStandaloneApp() && getShouldCheckForNewVersionValue) {
@@ -1151,6 +1204,7 @@ void OptionsView::buttonClicked (Button* buttonThatWasClicked)
             //}
         }
     }
+#endif
     else if (buttonThatWasClicked == mOptionsSliderSnapToMouseButton.get()) {
         bool newval = mOptionsSliderSnapToMouseButton->getToggleState();
         processor.setSlidersSnapToMousePosition(newval);
@@ -1160,6 +1214,9 @@ void OptionsView::buttonClicked (Button* buttonThatWasClicked)
         if (updateSliderSnap) {
             updateSliderSnap();
         }
+    }
+    else if (buttonThatWasClicked == mOptionsAllowRemoteMixButton.get()) {
+        processor.setAllowRemoteMixControl(mOptionsAllowRemoteMixButton->getToggleState());
     }
     else if (buttonThatWasClicked == mOptionsDisableShortcutButton.get()) {
         bool newval = mOptionsDisableShortcutButton->getToggleState();
@@ -1175,6 +1232,7 @@ void OptionsView::buttonClicked (Button* buttonThatWasClicked)
         processor.resetDefaultPluginSettings();
     }
 
+#if SONOBUS_FEATURE_I18N
     else if (buttonThatWasClicked == mOptionsUnivFontButton.get()) {
         bool newval = mOptionsUnivFontButton->getToggleState();
         String message;
@@ -1214,6 +1272,7 @@ void OptionsView::buttonClicked (Button* buttonThatWasClicked)
 
 
     }
+#endif
 
 }
 
@@ -1226,12 +1285,15 @@ void OptionsView::choiceButtonSelected(SonoChoiceButton *comp, int index, int id
     else if (comp == mOptionsAutosizeDefaultChoice.get()) {
         processor.setDefaultAutoresizeBufferMode((SonobusAudioProcessor::AutoNetBufferMode) ident);
     }
+#if SONOBUS_FEATURE_RECORD
     else if (comp == mRecFormatChoice.get()) {
         processor.setDefaultRecordingFormat((SonobusAudioProcessor::RecordFileFormat) ident);
     }
     else if (comp == mRecBitsChoice.get()) {
         processor.setDefaultRecordingBitsPerSample(ident);
     }
+#endif
+#if SONOBUS_FEATURE_I18N
     else if (comp == mOptionsLanguageChoice.get()) {
         String code = codes[ident];
         //app->mainConfig.languageOverrideCode =  codes[comp->getRowId()].toStdString();
@@ -1274,11 +1336,13 @@ void OptionsView::choiceButtonSelected(SonoChoiceButton *comp, int index, int id
             }
         }));
     }
+#endif
 
 }
 
 void OptionsView::chooseRecDirBrowser()
 {
+#if SONOBUS_FEATURE_RECORD
     SafePointer<OptionsView> safeThis (this);
 
     File recdir;
@@ -1338,6 +1402,7 @@ void OptionsView::chooseRecDirBrowser()
 
     }, nullptr);
 
+#endif
 }
 
 
@@ -1375,17 +1440,6 @@ void OptionsView::showPopTip(const String & message, int timeoutMs, Component * 
 
 void OptionsView::paint(Graphics & g)
 {
-    /*
-    //g.fillAll (Colours::black);
-    Rectangle<int> bounds = getLocalBounds();
-
-    bounds.reduce(1, 1);
-    bounds.removeFromLeft(3);
-    
-    g.setColour(bgColor);
-    g.fillRoundedRectangle(bounds.toFloat(), 6.0f);
-    g.setColour(outlineColor);
-    g.drawRoundedRectangle(bounds.toFloat(), 6.0f, 0.5f);
-*/
+    g.fillAll (SlimUi::background());
 }
 

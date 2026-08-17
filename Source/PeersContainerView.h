@@ -5,13 +5,13 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "SonobusFeatures.h"
 
 #include "SonobusPluginProcessor.h"
 #include "SonoLookAndFeel.h"
 #include "SonoChoiceButton.h"
 #include "SonoDrawableButton.h"
 #include "GenericItemChooser.h"
-#include "CompressorView.h"
 
 #include "ChannelGroupsView.h"
 
@@ -157,6 +157,8 @@ public:
     bool isNarrow = false;
     bool fullMode = true;
     bool addrClicked = false;
+    bool peerOnline = true;
+    String peerDisplayName;
     
     Colour bgColor;
     Colour borderColor;
@@ -308,7 +310,9 @@ protected:
 
     OwnedArray<PendingPeerViewInfo> mPendingPeerViews;
 
+#if SONOBUS_FEATURE_FX || SONOBUS_FEATURE_REVERB
     std::unique_ptr<ChannelGroupEffectsView> mEffectsView;
+#endif
 
     std::unique_ptr<DrawableImage> mDragDrawable;
     std::unique_ptr<DrawableRectangle> mInsertLine;

@@ -21,7 +21,9 @@
 #include <algorithm>
 
 #include "LatencyMeasurer.h"
+#if SONOBUS_FEATURE_METRONOME
 #include "Metronome.h"
+#endif
 
 using namespace SonoAudio;
 
@@ -766,7 +768,7 @@ mState (*this, &mUndoManager, "SonoBusAoO",
     // LEAVE EMPTY by default
 #else
     auto parentDir = File::getSpecialLocation (File::userMusicDirectory);
-    parentDir = parentDir.getChildFile("SonoBus");
+    parentDir = parentDir.getChildFile("Netlay");
     mDefaultRecordDir = URL(parentDir);
     mLastBrowseDir = mDefaultRecordDir.getLocalFile().getFullPathName();
 #endif
@@ -792,12 +794,14 @@ mState (*this, &mUndoManager, "SonoBusAoO",
     mState.getParameter(paramSendChannels)->setValue(mState.getParameter(paramSendChannels)->convertTo0to1(mSendChannels.get()));
 
     mTempoParameter = mState.getParameter(paramMetTempo);
-    
+
+#if SONOBUS_FEATURE_METRONOME
     mMetronome = std::make_unique<SonoAudio::Metronome>();
     
     mMetronome->loadBarSoundFromBinaryData(BinaryData::bar_click_wav, BinaryData::bar_click_wavSize);
     mMetronome->loadBeatSoundFromBinaryData(BinaryData::beat_click_wav, BinaryData::beat_click_wavSize);
     mMetronome->setTempo(100.0);
+#endif
     
     mMainReverb = std::make_unique<Reverb>();
     mMainReverbParams.dryLevel = 0.0f;
@@ -1551,7 +1555,9 @@ void SonobusAudioProcessor::setRemotePeerCompressorParams(int index, int changro
 
     if (changroup >= 0 && changroup < MAX_CHANGROUPS) {
         remote->chanGroups[changroup].params.compressorParams = params;
+#if SONOBUS_FEATURE_FX
         remote->chanGroups[changroup].compressorParamsChanged = true;
+#endif
     }
 }
 
@@ -1581,7 +1587,9 @@ void SonobusAudioProcessor::setRemotePeerExpanderParams(int index, int changroup
 
     if (changroup >= 0 && changroup < MAX_CHANGROUPS) {
         remote->chanGroups[changroup].params.expanderParams = params;
+#if SONOBUS_FEATURE_FX
         remote->chanGroups[changroup].expanderParamsChanged = true;
+#endif
     }
 }
 
@@ -1607,7 +1615,9 @@ void SonobusAudioProcessor::setRemotePeerEqParams(int index, int changroup, Sono
 
     if (changroup >= 0 && changroup < MAX_CHANGROUPS) {
         remote->chanGroups[changroup].params.eqParams = params;
+#if SONOBUS_FEATURE_FX
         remote->chanGroups[changroup].eqParamsChanged = true;
+#endif
     }
 }
 
@@ -1778,7 +1788,9 @@ void SonobusAudioProcessor::setInputCompressorParams(int changroup, CompressorPa
 
     if (changroup >= 0 && changroup < MAX_CHANGROUPS) {
         mInputChannelGroups[changroup].params.compressorParams = params;
+#if SONOBUS_FEATURE_FX
         mInputChannelGroups[changroup].compressorParamsChanged = true;
+#endif
     }
 }
 
@@ -1798,7 +1810,9 @@ void SonobusAudioProcessor::setInputLimiterParams(int changroup, CompressorParam
 
     if (changroup >= 0 && changroup < MAX_CHANGROUPS) {
         mInputChannelGroups[changroup].params.limiterParams = params;
+#if SONOBUS_FEATURE_FX
         mInputChannelGroups[changroup].limiterParamsChanged = true;
+#endif
     }
 }
 
@@ -1838,7 +1852,9 @@ void SonobusAudioProcessor::setInputExpanderParams(int changroup, CompressorPara
 
     if (changroup >= 0 && changroup < MAX_CHANGROUPS) {
         mInputChannelGroups[changroup].params.expanderParams = params;
+#if SONOBUS_FEATURE_FX
         mInputChannelGroups[changroup].expanderParamsChanged = true;
+#endif
     }
 }
 
@@ -1855,7 +1871,9 @@ void SonobusAudioProcessor::setInputEqParams(int changroup, ParametricEqParams &
 {
     if (changroup >= 0 && changroup < MAX_CHANGROUPS) {
         mInputChannelGroups[changroup].params.eqParams = params;
+#if SONOBUS_FEATURE_FX
         mInputChannelGroups[changroup].eqParamsChanged = true;
+#endif
     }
 }
 
@@ -2458,6 +2476,30 @@ void SonobusAudioProcessor::doReceiveData()
 #define SONOBUS_MSG_SUGGEST_GROUP_LEN 14
 #define SONOBUS_FULLMSG_SUGGEST_GROUP SONOBUS_MSG_DOMAIN SONOBUS_MSG_SUGGEST_GROUP
 
+#define SONOBUS_MSG_RMQUERY "/rmquery"
+#define SONOBUS_MSG_RMQUERY_LEN 8
+#define SONOBUS_FULLMSG_RMQUERY SONOBUS_MSG_DOMAIN SONOBUS_MSG_RMQUERY
+
+#define SONOBUS_MSG_RMSTATE "/rmstate"
+#define SONOBUS_MSG_RMSTATE_LEN 8
+#define SONOBUS_FULLMSG_RMSTATE SONOBUS_MSG_DOMAIN SONOBUS_MSG_RMSTATE
+
+#define SONOBUS_MSG_RMNACK "/rmnack"
+#define SONOBUS_MSG_RMNACK_LEN 7
+#define SONOBUS_FULLMSG_RMNACK SONOBUS_MSG_DOMAIN SONOBUS_MSG_RMNACK
+
+#define SONOBUS_MSG_RMLIVE "/rmlive"
+#define SONOBUS_MSG_RMLIVE_LEN 7
+#define SONOBUS_FULLMSG_RMLIVE SONOBUS_MSG_DOMAIN SONOBUS_MSG_RMLIVE
+
+#define SONOBUS_MSG_RMACK "/rmack"
+#define SONOBUS_MSG_RMACK_LEN 6
+#define SONOBUS_FULLMSG_RMACK SONOBUS_MSG_DOMAIN SONOBUS_MSG_RMACK
+
+#define SONOBUS_MSG_RMSET "/rmset"
+#define SONOBUS_MSG_RMSET_LEN 6
+#define SONOBUS_FULLMSG_RMSET SONOBUS_MSG_DOMAIN SONOBUS_MSG_RMSET
+
 
 enum {
     SONOBUS_MSGTYPE_UNKNOWN = 0,
@@ -2470,7 +2512,13 @@ enum {
     SONOBUS_MSGTYPE_LATINFO,
     SONOBUS_MSGTYPE_SUGGESTLAT,
     SONOBUS_MSGTYPE_BLOCKEDINFO,
-    SONOBUS_MSGTYPE_SUGGESTGROUP
+    SONOBUS_MSGTYPE_SUGGESTGROUP,
+    SONOBUS_MSGTYPE_RMSET,
+    SONOBUS_MSGTYPE_RMLIVE,
+    SONOBUS_MSGTYPE_RMQUERY,
+    SONOBUS_MSGTYPE_RMSTATE,
+    SONOBUS_MSGTYPE_RMACK,
+    SONOBUS_MSGTYPE_RMNACK
 };
 
 static int32_t sonobusOscParsePattern(const char *msg, int32_t n, int32_t & rettype)
@@ -2549,6 +2597,48 @@ static int32_t sonobusOscParsePattern(const char *msg, int32_t n, int32_t & rett
         {
             rettype = SONOBUS_MSGTYPE_SUGGESTGROUP;
             offset += SONOBUS_MSG_SUGGEST_GROUP_LEN;
+            return offset;
+        }
+        else if (n >= (offset + SONOBUS_MSG_RMQUERY_LEN)
+            && !memcmp(msg + offset, SONOBUS_MSG_RMQUERY, SONOBUS_MSG_RMQUERY_LEN))
+        {
+            rettype = SONOBUS_MSGTYPE_RMQUERY;
+            offset += SONOBUS_MSG_RMQUERY_LEN;
+            return offset;
+        }
+        else if (n >= (offset + SONOBUS_MSG_RMSTATE_LEN)
+            && !memcmp(msg + offset, SONOBUS_MSG_RMSTATE, SONOBUS_MSG_RMSTATE_LEN))
+        {
+            rettype = SONOBUS_MSGTYPE_RMSTATE;
+            offset += SONOBUS_MSG_RMSTATE_LEN;
+            return offset;
+        }
+        else if (n >= (offset + SONOBUS_MSG_RMNACK_LEN)
+            && !memcmp(msg + offset, SONOBUS_MSG_RMNACK, SONOBUS_MSG_RMNACK_LEN))
+        {
+            rettype = SONOBUS_MSGTYPE_RMNACK;
+            offset += SONOBUS_MSG_RMNACK_LEN;
+            return offset;
+        }
+        else if (n >= (offset + SONOBUS_MSG_RMLIVE_LEN)
+            && !memcmp(msg + offset, SONOBUS_MSG_RMLIVE, SONOBUS_MSG_RMLIVE_LEN))
+        {
+            rettype = SONOBUS_MSGTYPE_RMLIVE;
+            offset += SONOBUS_MSG_RMLIVE_LEN;
+            return offset;
+        }
+        else if (n >= (offset + SONOBUS_MSG_RMACK_LEN)
+            && !memcmp(msg + offset, SONOBUS_MSG_RMACK, SONOBUS_MSG_RMACK_LEN))
+        {
+            rettype = SONOBUS_MSGTYPE_RMACK;
+            offset += SONOBUS_MSG_RMACK_LEN;
+            return offset;
+        }
+        else if (n >= (offset + SONOBUS_MSG_RMSET_LEN)
+            && !memcmp(msg + offset, SONOBUS_MSG_RMSET, SONOBUS_MSG_RMSET_LEN))
+        {
+            rettype = SONOBUS_MSGTYPE_RMSET;
+            offset += SONOBUS_MSG_RMSET_LEN;
             return offset;
         }
         else {
@@ -2851,6 +2941,195 @@ bool SonobusAudioProcessor::handleOtherMessage(EndpointState * endpoint, const c
             
             clientListeners.call(&SonobusAudioProcessor::ClientListener::peerBlockedInfoChanged, this, username, blocked);
         }
+        else if (type == SONOBUS_MSGTYPE_RMSET || type == SONOBUS_MSGTYPE_RMLIVE)
+        {
+            auto it = message.ArgumentsBegin();
+            const int ver = (it++)->AsInt32();
+            const int seq = (it++)->AsInt32();
+            const String from (CharPointer_UTF8 ((it++)->AsString()));
+            const String sourceId (CharPointer_UTF8 ((it++)->AsString()));
+            const float gain = (it++)->AsFloat();
+            const int flags = (it++)->AsInt32();
+            const bool live = (type == SONOBUS_MSGTYPE_RMLIVE);
+            const bool muted = (flags & RemoteMix::muteFlag) != 0;
+
+            if (ver != RemoteMix::protoVer)
+            {
+                if (! live)
+                    sendRemoteMixNack (endpoint, seq, RemoteMix::NackReason::BadVer);
+                return true;
+            }
+
+            if (! mAllowRemoteMixControl)
+            {
+                if (! live)
+                    sendRemoteMixNack (endpoint, seq, RemoteMix::NackReason::Denied);
+                return true;
+            }
+
+            bool apply = true;
+            {
+                const ScopedLock ml (mRemoteMixLock);
+                auto& tx = mRemoteMixTx[from];
+                auto& lastMap = live ? tx.lastLiveSeq : tx.lastAppliedSeq;
+                const int last = lastMap[sourceId];
+                if (seq <= last)
+                    apply = false;
+                else
+                    lastMap[sourceId] = seq;
+            }
+
+            if (apply)
+            {
+                if (! applyRemoteMixSource (sourceId, gain, muted))
+                {
+                    if (! live)
+                        sendRemoteMixNack (endpoint, seq, RemoteMix::NackReason::UnknownSource);
+                    return true;
+                }
+
+                notifyRemoteMixBeingControlled (from);
+                clientListeners.call (&SonobusAudioProcessor::ClientListener::remoteMixBeingControlled, this, from);
+            }
+
+            // Always ACK a reliable set, even a duplicate, or the sender keeps retrying.
+            if (! live)
+                sendRemoteMixAck (endpoint, seq);
+        }
+        else if (type == SONOBUS_MSGTYPE_RMQUERY)
+        {
+            auto it = message.ArgumentsBegin();
+            const int ver = (it++)->AsInt32();
+            const int seq = (it++)->AsInt32();
+            const String from (CharPointer_UTF8 ((it++)->AsString()));
+            juce::ignoreUnused (from);
+
+            if (ver != RemoteMix::protoVer)
+            {
+                sendRemoteMixNack (endpoint, seq, RemoteMix::NackReason::BadVer);
+                return true;
+            }
+
+            sendRemoteMixAck (endpoint, seq);
+
+            const int replySeq = nextRemoteMixSeq();
+            auto packets = buildRemoteMixStatePackets (replySeq);
+            const ScopedReadLock sl (mCoreLock);
+            if (auto* peer = findRemotePeer (endpoint, -1))
+            {
+                for (auto& pkt : packets)
+                    queueReliableRemoteMix (peer, replySeq, RemoteMix::Kind::State, {}, pkt);
+            }
+        }
+        else if (type == SONOBUS_MSGTYPE_RMSTATE)
+        {
+            auto it = message.ArgumentsBegin();
+            const int ver = (it++)->AsInt32();
+            const int seq = (it++)->AsInt32();
+            const String from (CharPointer_UTF8 ((it++)->AsString()));
+            const int chunk = (it++)->AsInt32();
+            const int chunks = (it++)->AsInt32();
+            const String jsonstr (CharPointer_UTF8 ((it++)->AsString()));
+
+            if (ver != RemoteMix::protoVer)
+                return true;
+
+            sendRemoteMixAck (endpoint, seq);
+
+            String full = jsonstr;
+
+            if (chunk != 0 || chunks != 1)
+            {
+                const String key = from + ":" + String (seq);
+                const ScopedLock ml (mRemoteMixLock);
+
+                if (chunk == 0)
+                    mRemoteMixChunks[key] = jsonstr;
+                else
+                    mRemoteMixChunks[key] += jsonstr;
+
+                if (chunk + 1 < chunks)
+                    return true;
+
+                full = mRemoteMixChunks[key];
+                mRemoteMixChunks.erase (key);
+            }
+
+            juce::var parsed;
+            if (JSON::parse (full, parsed).wasOk() && parsed.isObject())
+            {
+                Array<RemoteMix::SourceState> sources;
+                if (auto* arr = parsed.getProperty ("sources", var()).getArray())
+                {
+                    for (auto& item : *arr)
+                    {
+                        RemoteMix::SourceState s;
+                        s.id = item.getProperty ("id", "").toString();
+                        s.name = item.getProperty ("name", "").toString();
+                        s.kind = item.getProperty ("kind", "").toString();
+                        s.gain = (float) item.getProperty ("gain", 1.0);
+                        s.muted = (bool) item.getProperty ("mute", false);
+                        sources.add (s);
+                    }
+                }
+                clientListeners.call (&SonobusAudioProcessor::ClientListener::remoteMixStateReceived, this, from, sources);
+            }
+        }
+        else if (type == SONOBUS_MSGTYPE_RMACK)
+        {
+            auto it = message.ArgumentsBegin();
+            const int ver = (it++)->AsInt32();
+            const int seq = (it++)->AsInt32();
+            const String from (CharPointer_UTF8 ((it++)->AsString()));
+            juce::ignoreUnused (ver);
+
+            RemoteMixPendingItem acked;
+            bool found = false;
+            {
+                const ScopedLock ml (mRemoteMixLock);
+                auto& tx = mRemoteMixTx[from];
+                for (int i = tx.pending.size(); --i >= 0;)
+                {
+                    if (tx.pending.getReference (i).seq == seq)
+                    {
+                        acked = tx.pending.getReference (i);
+                        tx.pending.remove (i);
+                        tx.status = RemoteMix::MemberStatus::Ok;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if (found && acked.kind == RemoteMix::Kind::Set)
+                clientListeners.call (&SonobusAudioProcessor::ClientListener::remoteMixControlAck, this, from, acked.sourceId, acked.gain, acked.muted);
+        }
+        else if (type == SONOBUS_MSGTYPE_RMNACK)
+        {
+            auto it = message.ArgumentsBegin();
+            const int ver = (it++)->AsInt32();
+            const int seq = (it++)->AsInt32();
+            const String from (CharPointer_UTF8 ((it++)->AsString()));
+            const int reason = (it++)->AsInt32();
+            juce::ignoreUnused (ver);
+
+            String sourceId;
+            {
+                const ScopedLock ml (mRemoteMixLock);
+                auto& tx = mRemoteMixTx[from];
+                for (int i = tx.pending.size(); --i >= 0;)
+                {
+                    if (tx.pending.getReference (i).seq == seq)
+                    {
+                        sourceId = tx.pending.getReference (i).sourceId;
+                        tx.pending.remove (i);
+                        break;
+                    }
+                }
+            }
+
+            clientListeners.call (&SonobusAudioProcessor::ClientListener::remoteMixControlFailed, this, from, sourceId, reason);
+        }
         return true;
     } catch (const osc::Exception& e){
         DBG("exception in handleOtherMessage: " << e.what());
@@ -2861,6 +3140,10 @@ bool SonobusAudioProcessor::handleOtherMessage(EndpointState * endpoint, const c
 
 bool SonobusAudioProcessor::sendChatEvent(const SBChatEvent & event)
 {
+#if !SONOBUS_FEATURE_CHAT
+    juce::ignoreUnused(event);
+    return false;
+#else
     // /sb/chat s:groupname s:from s:targets s:tags s:message
 
     // if peerindex < 0 - send to all peers
@@ -2899,6 +3182,7 @@ bool SonobusAudioProcessor::sendChatEvent(const SBChatEvent & event)
     }
 
     return true;
+#endif
 }
 
 void SonobusAudioProcessor::handleLatInfo(const juce::var & infolist)
@@ -3227,6 +3511,571 @@ int32_t SonobusAudioProcessor::sendPeerMessage(RemotePeer * peer, const char *ms
     return endpoint_send(peer->endpoint, msg, n);
 }
 
+int SonobusAudioProcessor::nextRemoteMixSeq()
+{
+    const ScopedLock ml (mRemoteMixLock);
+    return mRemoteMixNextSeq++;
+}
+
+void SonobusAudioProcessor::sendRemoteMixPacket (RemotePeer * peer, const MemoryBlock & packet)
+{
+    if (peer != nullptr && packet.getSize() > 0)
+        sendPeerMessage (peer, (const char*) packet.getData(), (int32_t) packet.getSize());
+}
+
+MemoryBlock SonobusAudioProcessor::buildRemoteMixSetPacket (int seq, const String & sourceId, float gain, int flags, bool live)
+{
+    char buf[AOO_MAXPACKETSIZE];
+    osc::OutboundPacketStream msg (buf, sizeof (buf));
+    try
+    {
+        msg << osc::BeginMessage (live ? SONOBUS_FULLMSG_RMLIVE : SONOBUS_FULLMSG_RMSET)
+            << RemoteMix::protoVer
+            << seq
+            << mCurrentUsername.toRawUTF8()
+            << sourceId.toRawUTF8()
+            << gain
+            << flags
+            << osc::EndMessage;
+        return MemoryBlock (msg.Data(), (size_t) msg.Size());
+    }
+    catch (const osc::Exception& e)
+    {
+        DBG ("rmset packet failed: " << e.what());
+        return {};
+    }
+}
+
+MemoryBlock SonobusAudioProcessor::buildRemoteMixQueryPacket (int seq)
+{
+    char buf[AOO_MAXPACKETSIZE];
+    osc::OutboundPacketStream msg (buf, sizeof (buf));
+    try
+    {
+        msg << osc::BeginMessage (SONOBUS_FULLMSG_RMQUERY)
+            << RemoteMix::protoVer
+            << seq
+            << mCurrentUsername.toRawUTF8()
+            << osc::EndMessage;
+        return MemoryBlock (msg.Data(), (size_t) msg.Size());
+    }
+    catch (const osc::Exception& e)
+    {
+        DBG ("rmquery packet failed: " << e.what());
+        return {};
+    }
+}
+
+Array<MemoryBlock> SonobusAudioProcessor::buildRemoteMixStatePackets (int seq)
+{
+    Array<RemoteMix::SourceState> sources;
+    {
+        const ScopedReadLock sl (mCoreLock);
+        sources = buildLocalMixSnapshotLocked();
+    }
+
+    Array<var> items;
+    for (auto& s : sources)
+    {
+        auto* o = new DynamicObject();
+        o->setProperty ("id", s.id);
+        o->setProperty ("name", s.name);
+        o->setProperty ("kind", s.kind);
+        o->setProperty ("gain", s.gain);
+        o->setProperty ("mute", s.muted);
+        items.add (var (o));
+    }
+    auto* root = new DynamicObject();
+    root->setProperty ("sources", items);
+    const String json = JSON::toString (var (root), true);
+
+    Array<MemoryBlock> packets;
+    const int maxChunk = jmax (256, AOO_MAXPACKETSIZE - 400);
+    const int nchunks = jmax (1, (json.length() + maxChunk - 1) / maxChunk);
+
+    for (int c = 0; c < nchunks; ++c)
+    {
+        const String part = json.substring (c * maxChunk, (c + 1) * maxChunk);
+        char buf[AOO_MAXPACKETSIZE];
+        osc::OutboundPacketStream msg (buf, sizeof (buf));
+        try
+        {
+            msg << osc::BeginMessage (SONOBUS_FULLMSG_RMSTATE)
+                << RemoteMix::protoVer
+                << seq
+                << mCurrentUsername.toRawUTF8()
+                << c
+                << nchunks
+                << part.toRawUTF8()
+                << osc::EndMessage;
+            packets.add (MemoryBlock (msg.Data(), (size_t) msg.Size()));
+        }
+        catch (const osc::Exception& e)
+        {
+            DBG ("rmstate packet failed: " << e.what());
+        }
+    }
+    return packets;
+}
+
+void SonobusAudioProcessor::queueReliableRemoteMix (RemotePeer * peer, int seq, RemoteMix::Kind kind, const String & sourceId, const MemoryBlock & packet)
+{
+    if (peer == nullptr || packet.getSize() == 0)
+        return;
+
+    sendRemoteMixPacket (peer, packet);
+
+    RemoteMixPendingItem item;
+    item.seq = seq;
+    item.targetUser = peer->userName;
+    item.sourceId = sourceId;
+    item.kind = kind;
+    item.packet = packet;
+    item.nextRetryMs = Time::getMillisecondCounterHiRes() + 40.0;
+    item.tries = 0;
+    item.retryDelayMs = 40;
+
+    const ScopedLock ml (mRemoteMixLock);
+    auto& tx = mRemoteMixTx[peer->userName];
+    if (kind == RemoteMix::Kind::Set)
+    {
+        for (int i = tx.pending.size(); --i >= 0;)
+            if (tx.pending.getReference (i).kind == RemoteMix::Kind::Set
+                && tx.pending.getReference (i).sourceId == sourceId)
+                tx.pending.remove (i);
+    }
+    tx.pending.add (item);
+    tx.status = RemoteMix::MemberStatus::Pending;
+}
+
+void SonobusAudioProcessor::sendRemoteMixAck (EndpointState * endpoint, int seq)
+{
+    char buf[AOO_MAXPACKETSIZE];
+    osc::OutboundPacketStream msg (buf, sizeof (buf));
+    try
+    {
+        msg << osc::BeginMessage (SONOBUS_FULLMSG_RMACK)
+            << RemoteMix::protoVer
+            << seq
+            << mCurrentUsername.toRawUTF8()
+            << osc::EndMessage;
+        endpoint_send (endpoint, msg.Data(), (int) msg.Size());
+    }
+    catch (const osc::Exception& e)
+    {
+        DBG ("rmack failed: " << e.what());
+    }
+}
+
+void SonobusAudioProcessor::sendRemoteMixNack (EndpointState * endpoint, int seq, RemoteMix::NackReason reason)
+{
+    char buf[AOO_MAXPACKETSIZE];
+    osc::OutboundPacketStream msg (buf, sizeof (buf));
+    try
+    {
+        msg << osc::BeginMessage (SONOBUS_FULLMSG_RMNACK)
+            << RemoteMix::protoVer
+            << seq
+            << mCurrentUsername.toRawUTF8()
+            << (int) reason
+            << osc::EndMessage;
+        endpoint_send (endpoint, msg.Data(), (int) msg.Size());
+    }
+    catch (const osc::Exception& e)
+    {
+        DBG ("rmnack failed: " << e.what());
+    }
+}
+
+void SonobusAudioProcessor::processRemoteMixRetries()
+{
+    const auto now = Time::getMillisecondCounterHiRes();
+    struct SendJob { String user; MemoryBlock packet; };
+    Array<SendJob> toSend;
+    Array<String> failedUsers;
+    Array<String> failedSources;
+
+    {
+        const ScopedLock ml (mRemoteMixLock);
+        for (auto& entry : mRemoteMixTx)
+        {
+            auto& tx = entry.second;
+            for (int i = tx.pending.size(); --i >= 0;)
+            {
+                auto& item = tx.pending.getReference (i);
+                if (now < item.nextRetryMs)
+                    continue;
+
+                if (item.tries >= RemoteMix::maxRetries)
+                {
+                    failedUsers.add (entry.first);
+                    failedSources.add (item.sourceId);
+                    tx.pending.remove (i);
+                    tx.status = RemoteMix::MemberStatus::Unreachable;
+                    tx.lastFailMs = Time::getMillisecondCounter();
+                    continue;
+                }
+
+                ++item.tries;
+                item.retryDelayMs = jmin (320, item.retryDelayMs * 2);
+                item.nextRetryMs = now + (double) item.retryDelayMs;
+                toSend.add ({ entry.first, item.packet });
+            }
+        }
+    }
+
+    for (auto& job : toSend)
+        if (auto* peer = findRemotePeerByUserName (job.user))
+            sendRemoteMixPacket (peer, job.packet);
+
+    for (int i = 0; i < failedUsers.size(); ++i)
+        clientListeners.call (&SonobusAudioProcessor::ClientListener::remoteMixControlFailed,
+                              this, failedUsers[i], failedSources[i], 0);
+}
+
+SonobusAudioProcessor::RemotePeer * SonobusAudioProcessor::findRemotePeerByUserName (const String & name)
+{
+    for (auto* peer : mRemotePeers)
+        if (peer->userName == name)
+            return peer;
+    return nullptr;
+}
+
+const SonobusAudioProcessor::RemotePeer * SonobusAudioProcessor::findRemotePeerByUserName (const String & name) const
+{
+    for (auto* peer : mRemotePeers)
+        if (peer->userName == name)
+            return peer;
+    return nullptr;
+}
+
+bool SonobusAudioProcessor::applyRemoteMixSource (const String & sourceId, float gain, bool muted)
+{
+    if (RemoteMix::isPeerSource (sourceId))
+    {
+        const String uname = RemoteMix::peerNameFromId (sourceId);
+        int index = -1;
+        {
+            const ScopedReadLock sl (mCoreLock);
+            for (int i = 0; i < mRemotePeers.size(); ++i)
+                if (mRemotePeers.getUnchecked (i)->userName == uname)
+                { index = i; break; }
+        }
+        if (index < 0)
+            return false;
+
+        setRemotePeerLevelGain (index, gain);
+        setRemotePeerRecvAllow (index, ! muted);
+        if (! muted)
+            setRemotePeerRecvActive (index, true);
+        return true;
+    }
+
+    if (RemoteMix::isLocalSource (sourceId))
+    {
+        const int gi = RemoteMix::localIndexFromId (sourceId);
+        if (gi < 0 || gi >= mInputChannelGroupCount)
+            return false;
+        setInputGroupGain (gi, gain);
+        setInputGroupMuted (gi, muted);
+        return true;
+    }
+
+    if (sourceId == RemoteMix::fileSourceId())
+    {
+        setFilePlaybackGain (gain);
+        return true;
+    }
+
+    if (sourceId == RemoteMix::soundboardSourceId() && soundboardChannelProcessor)
+    {
+        soundboardChannelProcessor->setGain (gain);
+        return true;
+    }
+
+    return false;
+}
+
+Array<RemoteMix::SourceState> SonobusAudioProcessor::buildLocalMixSnapshotLocked() const
+{
+    Array<RemoteMix::SourceState> sources;
+    for (int i = 0; i < mRemotePeers.size(); ++i)
+    {
+        auto* peer = mRemotePeers.getUnchecked (i);
+        RemoteMix::SourceState s;
+        s.id = RemoteMix::peerSourceId (peer->userName);
+        s.name = peer->userName;
+        s.kind = "peer";
+        s.gain = peer->gain;
+        s.muted = ! peer->recvAllow;
+        sources.add (s);
+    }
+    return sources;
+}
+
+Array<RemoteMix::SourceState> SonobusAudioProcessor::getLocalRemoteMixSnapshot() const
+{
+    Array<RemoteMix::SourceState> sources;
+    {
+        const ScopedReadLock sl (mCoreLock);
+        sources = buildLocalMixSnapshotLocked();
+    }
+    for (int i = 0; i < mInputChannelGroupCount; ++i)
+    {
+        RemoteMix::SourceState s;
+        s.id = RemoteMix::localSourceId (i);
+        s.name = mInputChannelGroups[i].params.name;
+        if (s.name.isEmpty())
+            s.name = "Input " + String (i + 1);
+        s.kind = "local";
+        s.gain = mInputChannelGroups[i].params.gain;
+        s.muted = mInputChannelGroups[i].params.muted;
+        sources.add (s);
+    }
+    {
+        RemoteMix::SourceState s;
+        s.id = RemoteMix::fileSourceId();
+        s.name = "File Playback";
+        s.kind = "file";
+        s.gain = mFilePlaybackChannelGroup.params.gain;
+        sources.add (s);
+    }
+    if (soundboardChannelProcessor)
+    {
+        RemoteMix::SourceState s;
+        s.id = RemoteMix::soundboardSourceId();
+        s.name = "Soundboard";
+        s.kind = "soundboard";
+        s.gain = soundboardChannelProcessor->getGain();
+        sources.add (s);
+    }
+    return sources;
+}
+
+Array<RemoteMix::SourceState> SonobusAudioProcessor::getAvailableRemoteMixSources() const
+{
+    return getLocalRemoteMixSnapshot();
+}
+
+void SonobusAudioProcessor::sendRemoteMixControl (const StringArray & targets, const String & sourceId, float gain, bool muted, bool live)
+{
+    const int flags = muted ? RemoteMix::muteFlag : 0;
+    const ScopedReadLock sl (mCoreLock);
+
+    for (auto* peer : mRemotePeers)
+    {
+        if (targets.isEmpty() || targets.contains (peer->userName))
+        {
+            const int seq = nextRemoteMixSeq();
+            auto pkt = buildRemoteMixSetPacket (seq, sourceId, gain, flags, live);
+            if (live)
+                sendRemoteMixPacket (peer, pkt);
+            else
+            {
+                queueReliableRemoteMix (peer, seq, RemoteMix::Kind::Set, sourceId, pkt);
+                const ScopedLock ml (mRemoteMixLock);
+                auto& tx = mRemoteMixTx[peer->userName];
+                for (auto& item : tx.pending)
+                    if (item.seq == seq)
+                    {
+                        item.gain = gain;
+                        item.muted = muted;
+                    }
+            }
+        }
+    }
+}
+
+void SonobusAudioProcessor::requestRemoteMixState (const String & targetUser)
+{
+    const ScopedReadLock sl (mCoreLock);
+    if (auto* peer = findRemotePeerByUserName (targetUser))
+    {
+        const int seq = nextRemoteMixSeq();
+        auto pkt = buildRemoteMixQueryPacket (seq);
+        queueReliableRemoteMix (peer, seq, RemoteMix::Kind::Query, {}, pkt);
+    }
+}
+
+void SonobusAudioProcessor::setAllowRemoteMixControl (bool flag)
+{
+    mAllowRemoteMixControl = flag;
+
+    if (! flag)
+    {
+        const ScopedLock ml (mRemoteMixLock);
+        mRemoteMixControllerName.clear();
+    }
+}
+
+String SonobusAudioProcessor::getRemoteMixControllerName() const
+{
+    const ScopedLock ml (mRemoteMixLock);
+    return mRemoteMixControllerName;
+}
+
+bool SonobusAudioProcessor::isBeingRemoteMixControlled() const
+{
+    const ScopedLock ml (mRemoteMixLock);
+    return mRemoteMixControllerName.isNotEmpty()
+        && (Time::getMillisecondCounter() - mRemoteMixControlledAtMs) < 4000;
+}
+
+void SonobusAudioProcessor::notifyRemoteMixBeingControlled (const String & fromUser)
+{
+    const ScopedLock ml (mRemoteMixLock);
+    mRemoteMixControllerName = fromUser;
+    mRemoteMixControlledAtMs = Time::getMillisecondCounter();
+}
+
+RemoteMix::MemberStatus SonobusAudioProcessor::getRemoteMixMemberStatus (const String & user) const
+{
+    const ScopedLock ml (mRemoteMixLock);
+    auto it = mRemoteMixTx.find (user);
+    if (it == mRemoteMixTx.end())
+        return RemoteMix::MemberStatus::Ok;
+    return it->second.status;
+}
+
+void SonobusAudioProcessor::ensureDefaultRemoteMixGroup()
+{
+    if (mRemoteMixGroups.isEmpty())
+    {
+        RemoteMix::ControlGroup g;
+        g.id = "main";
+        g.name = "Main Mix";
+        mRemoteMixGroups.add (g);
+        mSelectedRemoteMixGroup = 0;
+    }
+
+    auto& g = mRemoteMixGroups.getReference (0);
+    if (g.id != "main")
+        return;
+
+    StringArray connected;
+    {
+        const ScopedReadLock sl (mCoreLock);
+        for (auto* peer : mRemotePeers)
+            connected.addIfNotAlreadyThere (peer->userName);
+    }
+
+    // Main Mix tracks the session, but anything the user added by hand stays put.
+    for (int i = g.members.size(); --i >= 0;)
+        if (! connected.contains (g.members[i]))
+            g.members.remove (i);
+
+    for (int i = g.sourceIds.size(); --i >= 0;)
+        if (RemoteMix::isPeerSource (g.sourceIds[i])
+            && ! connected.contains (RemoteMix::peerNameFromId (g.sourceIds[i])))
+            g.sourceIds.remove (i);
+
+    for (auto& user : connected)
+    {
+        g.members.addIfNotAlreadyThere (user);
+        g.sourceIds.addIfNotAlreadyThere (RemoteMix::peerSourceId (user));
+    }
+}
+
+int SonobusAudioProcessor::getRemoteMixControlGroupCount() const
+{
+    return mRemoteMixGroups.size();
+}
+
+RemoteMix::ControlGroup SonobusAudioProcessor::getRemoteMixControlGroup (int index) const
+{
+    if (index >= 0 && index < mRemoteMixGroups.size())
+        return mRemoteMixGroups.getReference (index);
+    return {};
+}
+
+void SonobusAudioProcessor::setSelectedRemoteMixControlGroup (int index)
+{
+    if (index >= 0 && index < mRemoteMixGroups.size())
+        mSelectedRemoteMixGroup = index;
+}
+
+String SonobusAudioProcessor::addRemoteMixControlGroup (const String & name)
+{
+    RemoteMix::ControlGroup g;
+    g.id = Uuid().toDashedString();
+    g.name = name.isNotEmpty() ? name : "Mix";
+    mRemoteMixGroups.add (g);
+    mSelectedRemoteMixGroup = mRemoteMixGroups.size() - 1;
+    return g.id;
+}
+
+void SonobusAudioProcessor::removeRemoteMixControlGroup (const String & id)
+{
+    if (id == "main")
+        return;
+    for (int i = mRemoteMixGroups.size(); --i >= 0;)
+        if (mRemoteMixGroups.getReference (i).id == id)
+        {
+            mRemoteMixGroups.remove (i);
+            mSelectedRemoteMixGroup = jlimit (0, mRemoteMixGroups.size() - 1, mSelectedRemoteMixGroup);
+            break;
+        }
+}
+
+void SonobusAudioProcessor::setRemoteMixControlGroupMembers (const String & id, const StringArray & members)
+{
+    for (auto& g : mRemoteMixGroups)
+        if (g.id == id)
+        {
+            g.members = members;
+            break;
+        }
+}
+
+void SonobusAudioProcessor::setRemoteMixControlGroupSources (const String & id, const StringArray & sourceIds)
+{
+    for (auto& g : mRemoteMixGroups)
+        if (g.id == id)
+        {
+            g.sourceIds = sourceIds;
+            break;
+        }
+}
+
+void SonobusAudioProcessor::loadRemoteMixGroupsFromState (const ValueTree & extraTree)
+{
+    mAllowRemoteMixControl = (bool) extraTree.getProperty ("allowRemoteMix", true);
+    mRemoteMixGroups.clear();
+    auto groupsTree = extraTree.getChildWithName ("RemoteMixGroups");
+    if (groupsTree.isValid())
+    {
+        for (auto child : groupsTree)
+        {
+            RemoteMix::ControlGroup g;
+            g.id = child.getProperty ("id", "").toString();
+            g.name = child.getProperty ("name", "").toString();
+            g.members.addTokens (child.getProperty ("members", "").toString(), "|", {});
+            g.sourceIds.addTokens (child.getProperty ("sources", "").toString(), "|", {});
+            g.members.removeEmptyStrings();
+            g.sourceIds.removeEmptyStrings();
+            if (g.id.isNotEmpty())
+                mRemoteMixGroups.add (g);
+        }
+    }
+    ensureDefaultRemoteMixGroup();
+}
+
+void SonobusAudioProcessor::storeRemoteMixGroupsToState (ValueTree & extraTree)
+{
+    extraTree.setProperty ("allowRemoteMix", mAllowRemoteMixControl.load(), nullptr);
+    extraTree.removeChild (extraTree.getChildWithName ("RemoteMixGroups"), nullptr);
+    ValueTree groupsTree ("RemoteMixGroups");
+    for (auto& g : mRemoteMixGroups)
+    {
+        ValueTree child ("group");
+        child.setProperty ("id", g.id, nullptr);
+        child.setProperty ("name", g.name, nullptr);
+        child.setProperty ("members", g.members.joinIntoString ("|"), nullptr);
+        child.setProperty ("sources", g.sourceIds.joinIntoString ("|"), nullptr);
+        groupsTree.appendChild (child, nullptr);
+    }
+    extraTree.appendChild (groupsTree, nullptr);
+}
 
 void SonobusAudioProcessor::doSendData()
 {
@@ -3278,6 +4127,8 @@ void SonobusAudioProcessor::doSendData()
             }
         }
     }
+
+    processRemoteMixRetries();
 
     if (mPendingUnmute.get() && mPendingUnmuteAtStamp < Time::getMillisecondCounter() ) {
         DBG("UNMUTING ALL");
@@ -6610,7 +7461,8 @@ void SonobusAudioProcessor::parameterChanged (const String &parameterID, float n
         mMainReverbSize = newValue;
         mMainReverbParams.roomSize = jmap(mMainReverbSize.get(), 0.55f, 1.0f); //  mMainReverbSize.get() * 0.55f + 0.45f;
         mReverbParamsChanged = true;
-        
+
+#if SONOBUS_FEATURE_REVERB
         mMReverb.setParameter(MVerbFloat::SIZE, jmap(mMainReverbSize.get(), 0.45f, 0.95f)); 
         mMReverb.setParameter(MVerbFloat::DECAY, jmap(mMainReverbSize.get(), 0.45f, 0.95f));
 
@@ -6619,6 +7471,7 @@ void SonobusAudioProcessor::parameterChanged (const String &parameterID, float n
         //mZitaControl.setParamValue("/Zita_Rev1/Decay_Times_in_Bands_(see_tooltips)/Mid_RT60", jlimit(1.0f, 8.0f, mMainReverbSize.get() * 7.0f + 1.0f));
         mZitaControl.setParamValue("/Zita_Rev1/Decay_Times_in_Bands_(see_tooltips)/Low_RT60", jlimit(1.0f, 8.0f, mMainReverbSize.get() * 7.0f + 1.0f));
         mZitaControl.setParamValue("/Zita_Rev1/Decay_Times_in_Bands_(see_tooltips)/Mid_RT60", jlimit(1.0f, 8.0f, mMainReverbSize.get() * 7.0f + 1.0f));
+#endif
 
         //mMainReverb->setParameters(mMainReverbParams);
     }
@@ -6627,10 +7480,12 @@ void SonobusAudioProcessor::parameterChanged (const String &parameterID, float n
         mMainReverbLevel = newValue;
         mMainReverbParams.wetLevel = mMainReverbLevel.get() * 0.35f;
         mReverbParamsChanged = true;
+#if SONOBUS_FEATURE_REVERB
         mMReverb.setParameter(MVerbFloat::GAIN, jmap(mMainReverbLevel.get(), 0.0f, 0.8f)); 
 
         //mZitaControl.setParamValue("/Zita_Rev1/Output/Level", jlimit(-70.0f, 40.0f, Decibels::gainToDecibels(mMainReverbLevel.get()) + 0.0f));
         mZitaControl.setParamValue("/Zita_Rev1/Output/Level", jlimit(-70.0f, 40.0f, Decibels::gainToDecibels(mMainReverbLevel.get()) + 6.0f));
+#endif
         //mMainReverb->setParameters(mMainReverbParams);
     }
     else if (parameterID == paramMainReverbDamping)
@@ -6638,17 +7493,21 @@ void SonobusAudioProcessor::parameterChanged (const String &parameterID, float n
         mMainReverbDamping = newValue;
         mMainReverbParams.damping = mMainReverbDamping.get();
         mReverbParamsChanged = true;
+#if SONOBUS_FEATURE_REVERB
         mZitaControl.setParamValue("/Zita_Rev1/Decay_Times_in_Bands_(see_tooltips)/HF_Damping",                                    
                                    jmap(mMainReverbDamping.get(), 23520.0f, 1500.0f));
         mMReverb.setParameter(MVerbFloat::DAMPINGFREQ, jmap(mMainReverbDamping.get(), 0.0f, 0.85f));                
+#endif
 
     }
     else if (parameterID == paramMainReverbPreDelay)
     {
         mMainReverbPreDelay = newValue;
+#if SONOBUS_FEATURE_REVERB
         mZitaControl.setParamValue("/Zita_Rev1/Input/In_Delay",                                    
                                    jlimit(0.0f, 100.0f, mMainReverbPreDelay.get()));      
         mMReverb.setParameter(MVerbFloat::PREDELAY, jmap(mMainReverbPreDelay.get(), 0.0f, 100.0f, 0.0f, 0.5f)); // takes 0->1  where = 200ms
+#endif
 
     }
     else if (parameterID == paramMainReverbEnabled) {
@@ -6663,24 +7522,32 @@ void SonobusAudioProcessor::parameterChanged (const String &parameterID, float n
     {
         mInputReverbSize = newValue;
 
+#if SONOBUS_FEATURE_REVERB
         mInputReverb.setParameter(MVerbFloat::SIZE, jmap(mInputReverbSize.get(), 0.45f, 0.95f));
         mInputReverb.setParameter(MVerbFloat::DECAY, jmap(mInputReverbSize.get(), 0.45f, 0.95f));
+#endif
     }
     else if (parameterID == paramInputReverbLevel)
     {
         mInputReverbLevel = newValue;
+#if SONOBUS_FEATURE_REVERB
         mInputReverb.setParameter(MVerbFloat::GAIN, jmap(mInputReverbLevel.get(), 0.0f, 0.8f));
+#endif
     }
     else if (parameterID == paramInputReverbDamping)
     {
         mInputReverbDamping = newValue;
+#if SONOBUS_FEATURE_REVERB
         mInputReverb.setParameter(MVerbFloat::DAMPINGFREQ, jmap(mInputReverbDamping.get(), 0.0f, 0.85f));
+#endif
 
     }
     else if (parameterID == paramInputReverbPreDelay)
     {
         mInputReverbPreDelay = newValue;
+#if SONOBUS_FEATURE_REVERB
         mInputReverb.setParameter(MVerbFloat::PREDELAY, jmap(mInputReverbPreDelay.get(), 0.0f, 100.0f, 0.0f, 0.5f)); // takes 0->1  where = 200ms
+#endif
     }
 
     else if (parameterID == paramSendFileAudio) {
@@ -6917,8 +7784,11 @@ void SonobusAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBloc
     DBG("  numinbuses: " << getBusCount(true) << "  numoutbuses: " << getBusCount(false));
 
     const ScopedReadLock sl (mCoreLock);        
-    
+
+#if SONOBUS_FEATURE_METRONOME
     mMetronome->setSampleRate(sampleRate);
+#endif
+#if SONOBUS_FEATURE_REVERB
     mMainReverb->setSampleRate(sampleRate);
     mMReverb.setSampleRate(sampleRate);
     mInputReverb.setSampleRate(sampleRate);
@@ -6971,6 +7841,7 @@ void SonobusAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBloc
     
     mMainReverbParams.roomSize = jmap(mMainReverbSize.get(), 0.55f, 1.0f);
     mMainReverb->setParameters(mMainReverbParams);
+#endif
 
 
 
@@ -7351,8 +8222,10 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
     bool sendsoundboardaudio = mSendSoundboardAudio.get();
     bool sendmet = mSendMet.get();
 
+#if SONOBUS_FEATURE_RECORD
     bool userwritingpossible = userWritingPossible.load();
     bool writingpossible = writingPossible.load();
+#endif
 
     inGain = mMainInMute.get() ? 0.0f : inGain;
 
@@ -7462,9 +8335,11 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
 
 
     inputPostBuffer.clear(0, numSamples);
+#if SONOBUS_FEATURE_RECORD
     if (writingpossible && mRecordInputPreFX) {
         inputPreBuffer.clear(0, numSamples);
     }
+#endif
 
     bool inReverbEnabled = false;
     for (auto i = 0; i < mInputChannelGroupCount && i < MAX_CHANGROUPS; ++i)
@@ -7492,6 +8367,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
         mInputChannelGroups[i].processBlock(buffer, inputPostBuffer, destch, mInputChannelGroups[i].params.numChannels, silentBuffer, numSamples, inGain,
                                             nullptr, revbuf, 0, revfxchannels, inReverbEnabled);
 
+#if SONOBUS_FEATURE_RECORD
         if (writingpossible && mRecordInputPreFX) {
             // copy input as-is for later recording
             for (int ch = 0; ch < mInputChannelGroups[i].params.numChannels; ++ch) {
@@ -7500,6 +8376,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
                 inputPreBuffer.copyFrom(destch + ch, 0, srcbuf, numSamples);
             }
         }
+#endif
 
         destch += mInputChannelGroups[i].params.numChannels;
     }
@@ -7512,9 +8389,11 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
     destch = 0;
     for (auto i = 0; i < mInputChannelGroupCount && i < MAX_CHANGROUPS; ++i) {
         float redlev = 1.0f;
+#if SONOBUS_FEATURE_FX
         if (mInputChannelGroups[i].params.compressorParams.enabled && mInputChannelGroups[i].compressorOutputLevel) {
             redlev = jlimit(0.0f, 1.0f, Decibels::decibelsToGain(*mInputChannelGroups[i].compressorOutputLevel));
         }
+#endif
         for (auto j=0; j < mInputChannelGroups[i].params.numChannels; ++j) {
             //int ch = mInputChannelGroups[i].chanStartIndex + j;
             int ch = destch + j;
@@ -7687,6 +8566,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
     }
 
     // process metronome
+#if SONOBUS_FEATURE_METRONOME
     bool metenabled = mMetEnabled.get();
     float metgain = mMetGain.get();
     double mettempo = mMetTempo.get();
@@ -7753,9 +8633,15 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
         }
     }
     mLastMetEnabled = metenabled;
+#else
+    bool metenabled = false;
+    bool metrecorded = false;
+    juce::ignoreUnused(syncmetplayback, hostPlaying, transportPos, metrecorded);
+#endif
 
 
     // process and mix in input reverb into sendworkbuffer (if sending mono or stereo)
+#if SONOBUS_FEATURE_REVERB
     if (doinreverb) {
 
         if (inReverbEnabled != mLastInputReverbEnabled && inReverbEnabled) {
@@ -7780,6 +8666,10 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
     }
 
     mLastInputReverbEnabled = inReverbEnabled;
+#else
+    doinreverb = false;
+    mLastInputReverbEnabled = false;
+#endif
 
 
     // send meter post panning (and post file and met)
@@ -7855,6 +8745,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
             
             // record individual tracks pre-compressor/level/pan, ignoring muting/solo, raw material
 
+#if SONOBUS_FEATURE_RECORD
             if (userwritingpossible) {
                 const ScopedTryLock sl (writerLock);
                 if (sl.isLocked() && remote->fileWriter)
@@ -7872,6 +8763,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
                     remote->fileWriter->write (tmpbuf, numSamples);
                 }
             }
+#endif
 
             // write out per-user output bus
             if (remote->recvActive && remote->recvChannels > 0) {
@@ -7930,9 +8822,11 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
 
             for (auto cgi = 0; cgi < remote->numChanGroups; ++cgi) {
                 float redlev = 1.0f;
+#if SONOBUS_FEATURE_FX
                 if (remote->chanGroups[cgi].params.compressorParams.enabled && remote->chanGroups[cgi].compressorOutputLevel) {
                     redlev = jlimit(0.0f, 1.0f, Decibels::decibelsToGain(*remote->chanGroups[cgi].compressorOutputLevel));
                 }
+#endif
                 for (auto j=0; j < remote->chanGroups[cgi].params.numChannels; ++j) {
                     int ch = remote->chanGroups[cgi].params.chanStartIndex + j;
                     remote->recvMeterSource.setReductionLevel(ch, redlev);
@@ -7957,7 +8851,9 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
                 remote->chanGroups[i].processPan(remote->workBuffer, remote->chanGroups[i].params.chanStartIndex, tempBuffer, dstch, dstcnt, numSamples, adjgain);
 
                 if (doreverb) {
+#if SONOBUS_FEATURE_REVERB
                     remote->chanGroups[i].processReverbSend(remote->workBuffer, remote->chanGroups[i].params.chanStartIndex, remote->chanGroups[i].params.numChannels, mainFxBuffer, 0, fxchannels, numSamples, mainReverbEnabled, false, adjgain);
+#endif
                 }
 
             }
@@ -8108,9 +9004,11 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
         float egain = mainReverbEnabled ? 1.0f : 0.0f;
         
         if (mainReverbEnabled) {
+#if SONOBUS_FEATURE_REVERB
             mMainReverb->reset();
             mMReverb.reset();
             mZitaReverb.instanceClear();
+#endif
         }
 
         /*
@@ -8155,6 +9053,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
     
 
     if (doreverb) {
+#if SONOBUS_FEATURE_REVERB
         // assumes reverb is NO dry
         
         if (mReverbParamsChanged) {
@@ -8185,6 +9084,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
                 mMainReverb->processMono(mainFxBuffer.getWritePointer(0), numSamples);
             }            
         }
+#endif
     }
 
     if (mLastHasMainFx != hasmainfx) {
@@ -8241,6 +9141,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
     }
 
     if (metenabled) {
+#if SONOBUS_FEATURE_METRONOME
         int dstch = mMetChannelGroup.params.monDestStartIndex;
         int dstcnt = jmin(totalOutputChannels, mMetChannelGroup.params.monDestChannels);
         auto fgain = mMetChannelGroup.params.gain;
@@ -8248,6 +9149,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
 
         // process the monitor part of the metchannelgroup
         mMetChannelGroup.processMonitor(metBuffer, 0, buffer, dstch, dstcnt, numSamples, fgain);
+#endif
     }
 
 
@@ -8266,6 +9168,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
     outputMeterSource.measureBlock (buffer, 0, numSamples);
 
     // output to file writer if necessary
+#if SONOBUS_FEATURE_RECORD
     if (writingpossible) {
         const ScopedTryLock sl (writerLock);
         if (sl.isLocked())
@@ -8389,6 +9292,7 @@ void SonobusAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer
     if (writingpossible || userwritingpossible) {
         mElapsedRecordSamples += numSamples;
     }
+#endif
 
 
     lastSamplesPerBlock = numSamples;
@@ -8545,6 +9449,8 @@ void SonobusAudioProcessor::getStateInformationWithOptions(MemoryBlock& destData
     extraTree.setProperty(lastWindowHeightKey, var((int)mPluginWindowHeight), nullptr);
     extraTree.setProperty(autoresizeDropRateThreshKey, var((float)mAutoresizeDropRateThresh), nullptr);
     extraTree.setProperty(reconnectServerLossKey, mReconnectAfterServerLoss.get(), nullptr);
+
+    storeRemoteMixGroupsToState (extraTree);
 
     extraTree.appendChild(mVideoLinkInfo.getValueTree(), nullptr);
     
@@ -8715,6 +9621,8 @@ void SonobusAudioProcessor::setStateInformationWithOptions (const void* data, in
             setAutoresizeBufferDropRateThreshold(extraTree.getProperty(autoresizeDropRateThreshKey, (float)mAutoresizeDropRateThresh));
 
             setReconnectAfterServerLoss(extraTree.getProperty(reconnectServerLossKey, mReconnectAfterServerLoss.get()));
+
+            loadRemoteMixGroupsFromState (extraTree);
 
             
             ValueTree videoinfo = extraTree.getChildWithName(videoLinkInfoKey);
@@ -9091,6 +9999,10 @@ StringArray SonobusAudioProcessor::getAllBlockedAddresses() const
 
 bool SonobusAudioProcessor::startRecordingToFile(const URL & recordLocationUrl, const String & filename, URL & mainreturl, uint32 recordOptions, RecordFileFormat fileformat)
 {
+#if !SONOBUS_FEATURE_RECORD
+    juce::ignoreUnused(recordLocationUrl, filename, mainreturl, recordOptions, fileformat);
+    return false;
+#else
     if (!recordingThread) {
         recordingThread = std::make_unique<TimeSliceThread>("Recording Thread");
         recordingThread->startThread();        
@@ -9505,6 +10417,7 @@ bool SonobusAudioProcessor::startRecordingToFile(const URL & recordLocationUrl, 
     sendRemotePeerInfoUpdate();
 
     return ret;
+#endif
 }
 
 bool SonobusAudioProcessor::stopRecordingToFile()
@@ -9576,11 +10489,15 @@ bool SonobusAudioProcessor::stopRecordingToFile()
 
 bool SonobusAudioProcessor::isRecordingToFile()
 {
+#if !SONOBUS_FEATURE_RECORD
+    return false;
+#else
     return (activeMixWriter.load() != nullptr 
             || threadedSelfWriters.size() > 0
             || activeMixMinusWriter.load() != nullptr 
             || userWritingPossible.load()
             );
+#endif
 }
 
 void SonobusAudioProcessor::clearTransportURL()

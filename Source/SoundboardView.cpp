@@ -8,6 +8,7 @@
 #include "SoundboardView.h"
 #include "SoundboardEditView.h"
 #include "SampleEditView.h"
+#include "SlimUi.h"
 
 SoundboardView::SoundboardView(SonobusAudioProcessor& audioproc, SoundboardChannelProcessor* channelProcessor, File supportDir)
         : audioProcessor(audioproc), processor(std::make_unique<SoundboardProcessor>(channelProcessor, supportDir))
@@ -904,7 +905,7 @@ void SoundboardView::applyOptionsToAll(SoundSample & fromsample)
 
 void SoundboardView::paint(Graphics& g)
 {
-    g.fillAll(Colour(0xff272727));
+    g.fillAll(SlimUi::background());
 }
 
 void SoundboardView::componentVisibilityChanged (Component& component)
@@ -941,7 +942,7 @@ bool SoundboardView::processKeystroke(const KeyPress& keyPress)
 {
     // Only process keystrokes when the soundboard view is opened.
     // This is to prevent sounds from 'magically' playing.
-    if (!this->isVisible()) {
+    if (!this->isShowing()) {
         return false;
     }
 

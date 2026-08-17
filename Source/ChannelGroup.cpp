@@ -56,12 +56,13 @@ void ChannelGroup::copyParametersFrom(const ChannelGroup& other)
 {
     params = other.params;
 
+#if SONOBUS_FEATURE_FX
     compressorParamsChanged = true;
     expanderParamsChanged = true;
     eqParamsChanged = true;
     limiterParamsChanged = true;
     monitorDelayParamsChanged = true;
-
+#endif
 }
 
 void ChannelGroupParams::setToDefaults(bool isplugin)
@@ -77,7 +78,7 @@ void ChannelGroupParams::setToDefaults(bool isplugin)
         compressorParams.makeupGainDb = (-compressorParams.thresholdDb - abs(compressorParams.thresholdDb/compressorParams.ratio)) * 0.5f;
     }
 
-    limiterParams.enabled = !isplugin; // input limiter disabled by default in plugin
+    limiterParams.enabled = false;
     limiterParams.thresholdDb = -1.0f;
     limiterParams.ratio = 4.0f;
     limiterParams.attackMs = 0.01;
@@ -90,18 +91,14 @@ void ChannelGroupParams::setToDefaults(bool isplugin)
 void ChannelGroup::init(double sampRate)
 {
     sampleRate = sampRate;
-    
+
+#if SONOBUS_FEATURE_FX
     if (!compressor) {
         compressor = std::make_unique<faustCompressor>();
         compressorControl = std::make_unique<MapUI>();
     }
     compressor->init(sampleRate);
     compressor->buildUserInterface(compressorControl.get());
-
-    //DBG("Compressor Params:");
-    //for(int i=0; i < mInputCompressorControl.getParamsCount(); i++){
-    //    DBG(mInputCompressorControl.getParamAddress(i));
-    //}
 
     if (!expander) {
         expander = std::make_unique<faustExpander>();
@@ -110,11 +107,6 @@ void ChannelGroup::init(double sampRate)
 
     expander->init(sampleRate);
     expander->buildUserInterface(expanderControl.get());
-
-    //DBG("Expander Params:");
-    //for(int i=0; i < mInputExpanderControl.getParamsCount(); i++){
-    //    DBG(mInputExpanderControl.getParamAddress(i));
-    //}
 
     for (int j=0; j < 2; ++j) {
         if (!eq[j]) {
@@ -125,11 +117,6 @@ void ChannelGroup::init(double sampRate)
         eq[j]->buildUserInterface(eqControl[j].get());
     }
 
-    //DBG("EQ Params:");
-    //for(int i=0; i < mInputEqControl[0].getParamsCount(); i++){
-    //    DBG(mInputEqControl[0].getParamAddress(i));
-    //}
-
     if (!limiter) {
         limiter = std::make_unique<faustCompressor>();
         limiterControl = std::make_unique<MapUI>();
@@ -138,19 +125,15 @@ void ChannelGroup::init(double sampRate)
     limiter->init(sampleRate);
     limiter->buildUserInterface(limiterControl.get());
 
-    //DBG("Limiter Params:");
-    //for(int i=0; i < mInputLimiterControl.getParamsCount(); i++){
-    //    DBG(mInputLimiterControl.getParamAddress(i));
-    //}
-
     commitCompressorParams();
     commitExpanderParams();
     commitEqParams();
     commitLimiterParams();
     commitMonitorDelayParams();
-
+#endif
 }
 
+#if SONOBUS_FEATURE_FX
 void ChannelGroup::setMonitoringDelayEnabled(bool enabled, int numchans)
 {
     if (enabled) {
@@ -199,6 +182,7 @@ void ChannelGroup::setMonitoringDelayTimeMs(double delayms)
         _monitorDelayTimeChanged = true;
     }
 }
+#endif
 
 
 void ChannelGroup::processBlock (AudioBuffer<float>& frombuffer,
@@ -220,9 +204,9 @@ void ChannelGroup::processBlock (AudioBuffer<float>& frombuffer,
 
 
     float dogain = (params.muted ? 0.0f : params.gain) * gainfactor;
-    //dogain = 0.0f;
-
+#if SONOBUS_FEATURE_FX
     dogain *= params.invertPolarity ? -1.0f : 1.0f;
+#endif
 
     if (&frombuffer == &tobuffer) {
         // inplace, just apply gain, ignore destchans
@@ -239,6 +223,7 @@ void ChannelGroup::processBlock (AudioBuffer<float>& frombuffer,
 
     procstate.lastlevel = dogain;
 
+#if SONOBUS_FEATURE_FX
     // these all operate ONLY when the channel group has 1 or 2 channels (and when the effects have been initialized)
     if (params.numChannels > 0 && params.numChannels <= 2 && compressor)
     {
@@ -312,11 +297,14 @@ void ChannelGroup::processBlock (AudioBuffer<float>& frombuffer,
         }
         _lastLimiterEnabled = params.limiterParams.enabled;
     }
+#endif
     
+#if SONOBUS_FEATURE_REVERB
     // apply to reverb buffer
     if (reverbbuffer) {
         processReverbSend(tobuffer, destStartChan, jmin(params.numChannels, destNumChans), *reverbbuffer, revStartChan, revNumChans, numSamples, revEnabled, true, revgainfactor, &revprocstate);
     }
+#endif
 }
 
 void ChannelGroup::processPan (AudioBuffer<float>& frombuffer, int fromStartChan,
@@ -402,7 +390,11 @@ void ChannelGroup::processMonitor (AudioBuffer<float>& frombuffer, int fromStart
     auto & procstate = oprocstate != nullptr ? *oprocstate : monProcState;
     auto & revprocstate = orevprocstate != nullptr ? *orevprocstate : revProcState;
 
+    auto * usefrombuffer = &frombuffer;
+    auto useFromStartChan = fromStartChan;
+    auto useFromNumChan = fromNumChan;
 
+#if SONOBUS_FEATURE_FX
     if (monitorDelayParamsChanged) {
         commitMonitorDelayParams();
         monitorDelayParamsChanged = false;
@@ -410,10 +402,6 @@ void ChannelGroup::processMonitor (AudioBuffer<float>& frombuffer, int fromStart
 
     bool domondelay = _monitorDelayActive.load();
     int mondelayfade = 0;
-
-    auto * usefrombuffer = &frombuffer;
-    auto useFromStartChan = fromStartChan;
-    auto useFromNumChan = fromNumChan;
 
     if (domondelay || _monitorDelayLastActive != domondelay) {
         const ScopedTryLock lock(_monitorDelayLock);
@@ -481,6 +469,7 @@ void ChannelGroup::processMonitor (AudioBuffer<float>& frombuffer, int fromStart
             
         }
     }
+#endif
 
     if (useFromNumChan > 0 && destNumChans == 2) {
         //tobuffer.clear(0, numSamples);
@@ -532,9 +521,11 @@ void ChannelGroup::processMonitor (AudioBuffer<float>& frombuffer, int fromStart
     }
 
     // apply to reverb buffer
+#if SONOBUS_FEATURE_REVERB
     if (reverbbuffer) {
         processReverbSend(*usefrombuffer, useFromStartChan, jmin(params.numChannels, useFromNumChan), *reverbbuffer, revStartChan, revNumChans, numSamples, revEnabled, false, targmon * revgainfactor, &revprocstate);
     }
+#endif
 
     procstate.laststereopan[0] = params.panStereo[0];
     procstate.laststereopan[1] = params.panStereo[1];
@@ -716,6 +707,7 @@ void ChannelGroupParams::setFromValueTree(const ValueTree & channelGroupTree)
     ValueTree limiterTree = channelGroupTree.getChildWithName(limiterStateKey);
     if (limiterTree.isValid()) {
         limiterParams.setFromValueTree(limiterTree);
+        limiterParams.enabled = false;
     }
     ValueTree eqTree = channelGroupTree.getChildWithName(eqStateKey);
     if (eqTree.isValid()) {
@@ -780,6 +772,7 @@ void ChannelGroup::commitAllParams()
 }
 
 
+#if SONOBUS_FEATURE_FX
 void ChannelGroup::commitCompressorParams()
 {
     if (!compressorControl) return;
@@ -850,5 +843,6 @@ void ChannelGroup::commitMonitorDelayParams()
     setMonitoringDelayTimeMs(params.monitorDelayParams.delayTimeMs);
     setMonitoringDelayEnabled(params.monitorDelayParams.enabled, params.numChannels);
 }
+#endif
 
 
